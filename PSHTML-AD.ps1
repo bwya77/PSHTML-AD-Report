@@ -1,3 +1,9 @@
+function LastLogonConvert ($ftDate)
+{
+	$date = [DateTime]::FromFileTime($ftDate)
+	if ($date -lt (Get-Date '1/1/1900') -or $date -eq 0 -or $date -eq $null) { "Never" }
+	else { $date }
+} # End function LastLogonConvert
 
 #########################################
 #                                       #
@@ -16,6 +22,8 @@ $ReportTitle = "Active Directory Report"
 #Location the report will be saved to
 $ReportSavePath = "C:\Automation\"
 
+#Find users that have not logged in X Amount of days, this sets the days
+$Days = 1
 
 
 ########################################
@@ -78,12 +86,12 @@ $DefaultSGs = @(
 	
 	
 $Table 					= New-Object 'System.Collections.Generic.List[System.Object]'
-$LicenseTable 			= New-Object 'System.Collections.Generic.List[System.Object]'
+$OUTable 				= New-Object 'System.Collections.Generic.List[System.Object]'
 $UserTable 				= New-Object 'System.Collections.Generic.List[System.Object]'
 $SharedMailboxTable		= New-Object 'System.Collections.Generic.List[System.Object]'
 $GroupTypetable		    = New-Object 'System.Collections.Generic.List[System.Object]'
 $DefaultGrouptable 		= New-Object 'System.Collections.Generic.List[System.Object]'
-$IsLicensedUsersTable 	= New-Object 'System.Collections.Generic.List[System.Object]'
+$EnabledDisabledUsersTable 	= New-Object 'System.Collections.Generic.List[System.Object]'
 $ContactTable 			= New-Object 'System.Collections.Generic.List[System.Object]'
 $MailUser 				= New-Object 'System.Collections.Generic.List[System.Object]'
 $ContactMailUserTable 	= New-Object 'System.Collections.Generic.List[System.Object]'
@@ -94,11 +102,19 @@ $ExpiringAccountsTable 	= New-Object 'System.Collections.Generic.List[System.Obj
 $CompanyInfoTable 		= New-Object 'System.Collections.Generic.List[System.Object]'
 $securityeventtable 	= New-Object 'System.Collections.Generic.List[System.Object]'
 $DomainTable 			= New-Object 'System.Collections.Generic.List[System.Object]'
-
+$OUGPOTable 			= New-Object 'System.Collections.Generic.List[System.Object]'
+$GroupMembershipTable 	= New-Object 'System.Collections.Generic.List[System.Object]'
+$PasswordExpirationTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$PasswordExpireSoonTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$userphaventloggedonrecentlytable = New-Object 'System.Collections.Generic.List[System.Object]'
+$EnterpriseAdminTable = New-Object 'System.Collections.Generic.List[System.Object]'
 
 # Get all users right away. Instead of doing several lookups, we will use this object to look up all the information needed.
-$AllUsers = Get-ADUser -Filter *
+$AllUsers = Get-ADUser -Filter * -Properties *
 
+<###########################
+         Dashboard
+############################>
 
 #Company Information
 $ADInfo 				= Get-ADDomain
@@ -145,6 +161,26 @@ Foreach ($DomainAdminMember in $DomainAdminMembers)
 }
 
 
+#Get Enterprise Admins
+$EnterpriseAdminsMembers = Get-ADGroupMember "Enterprise Admins"
+
+Foreach ($EnterpriseAdminsMember in $EnterpriseAdminsMembers)
+{
+	$Name = $EnterpriseAdminsMember.Name
+	$Type = $EnterpriseAdminsMember.ObjectClass
+	$Enabled = (Get-ADUser -filter * | Where-Object { $_.Name -eq $Name }).Enabled
+	
+	$obj = [PSCustomObject]@{
+		'Name'    = $Name
+		'Enabled' = $Enabled
+		'Type'    = $Type
+	}
+	
+	$EnterpriseAdminTable.add($obj)
+	
+}
+
+
 
 #Expiring Accounts
 $LooseUsers = Search-ADAccount -AccountExpiring -UsersOnly 
@@ -159,8 +195,8 @@ Foreach ($LooseUser in $LooseUsers)
 	$obj = [PSCustomObject]@{
 		'Name'					   = $NameLoose
 		'UserPrincipalName'	       = $UPNLoose
-		'Expiration Date'		   = $LicensedLoose
-		'Enabled' 				   = $StrongPasswordLoose
+		'Expiration Date'		   = $ExpirationDate
+		'Enabled' 				   = $enabled
 	}
 	
 	
@@ -212,15 +248,20 @@ $Domains = Get-ADForest | Select-Object -ExpandProperty upnsuffixes | ForEach-Ob
 	$DomainTable.add($obj)
 }
 
+<###########################
+		   Groups
+############################>
 
 
 #Get groups and sort in alphabetical order
 $Groups = Get-ADGroup -Filter * | Sort-Object DisplayName
 
-$SecurityCount 		= 0
-$MailSecurityCount 	= 0
-$CustomGroup 		= 0
-$DefaultGroup 		= 0
+$SecurityCount 			= 0
+$MailSecurityCount 		= 0
+$CustomGroup 			= 0
+$DefaultGroup 			= 0
+$Groupswithmemebrship 	= 0
+$Groupswithnomembership = 0
 
 
 Foreach ($Group in $Groups)
@@ -268,21 +309,26 @@ Foreach ($Group in $Groups)
 	If ($Group.Name -ne "Domain Users")
 	{
 		$Users = (Get-ADGroupMember -Identity $Group | Sort-Object DisplayName | Select-Object -ExpandProperty Name) -join ", "
-	}
-	Else
-	{
+		If (!($Users))
+			{
+				$Groupswithnomembership++
+			}
+			Else
+			{
+				$Groupswithmemebrship++
+			}
+		}
+		Else
+		{
+			
+			$Users = "Skipped Domain Users Membership"
+			
+		}
 		
-		$Users = "Skipped Domain Users Membership"
-		
-	}
-	
-	$OwnerDN = Get-ADGroup -Filter { name -eq $Group.Name }  -Properties managedBy | Select-Object -ExpandProperty ManagedBy
+		$OwnerDN = Get-ADGroup -Filter { name -eq $Group.Name }  -Properties managedBy | Select-Object -ExpandProperty ManagedBy
 	
 	
 	$Manager = Get-ADUser -Filter * | Where-Object { $_.distinguishedname -eq $OwnerDN } | Select-Object -ExpandProperty Name
-	
-	
-	#$hash = New-Object PSObject -property @{ Name = "$GName"; Type = "$Type"; Members = "$Users" }
 	
 	
 	$obj = [PSCustomObject]@{
@@ -304,21 +350,21 @@ If (($table).count -eq 0)
 }
 
 $obj1 = [PSCustomObject]@{
-	'Name'  = 'Mail-Enabled Security Group'
+	'Name'  = 'Mail-Enabled Security Groups'
 	'Count' = $MailSecurityCount
 }
 
 $GroupTypetable.add($obj1)
 
 $obj1 = [PSCustomObject]@{
-	'Name'  = 'Security Group'
+	'Name'  = 'Security Groups'
 	'Count' = $SecurityCount
 }
 $GroupTypetable.add($obj1)
 
 $DistroCount = ($Groups | Where-Object { $_.GroupCategory -eq "Distribution" }).Count
 $obj1 = [PSCustomObject]@{
-	'Name'  = 'Distribution Group'
+	'Name'  = 'Distribution Groups'
 	'Count' = $DistroCount
 }
 
@@ -341,182 +387,262 @@ $obj1 = [PSCustomObject]@{
 $DefaultGrouptable.add($obj1)
 
 
+#Groups with membership vs no membership pie chart
 
-#Get all licenses
-$Licenses = Get-AzureADSubscribedSku
-#Split licenses at colon
-Foreach ($License in $Licenses)
+$objmem = [PSCustomObject]@{
+	'Name'  = 'With Members'
+	'Count' = $Groupswithmemebrship
+}
+
+$GroupMembershipTable.add($objmem)
+
+$objmem = [PSCustomObject]@{
+	'Name'  = 'No Members'
+	'Count' = $Groupswithnomembership
+}
+
+$GroupMembershipTable.add($objmem)
+
+
+<###########################
+    Organizational Units
+############################>
+
+#Get all OU's'
+$OUs = Get-ADOrganizationalUnit -filter * -properties * 
+
+$OUwithLinked = 0
+$OUwithnoLink = 0
+
+Foreach ($OU in $OUs)
 {
-	$TextLic = $null
-	
-	$ASku = ($License).SkuPartNumber
-	$TextLic = $Sku.Item("$ASku")
-	If (!($TextLic))
+	$LinkedGPOs = New-Object 'System.Collections.Generic.List[System.Object]'
+	If (($OU.linkedgrouppolicyobjects).length -lt 1)
 	{
-		$OLicense = $License.SkuPartNumber
+		$LinkedGPOs = "None"
+		$OUwithnoLink++
 	}
 	Else
 	{
-		$OLicense = $TextLic
-	}
-	
-	$TotalAmount = $License.PrepaidUnits.enabled
-	$Assigned = $License.ConsumedUnits
-	$Unassigned = ($TotalAmount - $Assigned)
-	
-	If ($TotalAmount -lt $LicenseFilter)
-	{
-		$obj = [PSCustomObject]@{
-			'Name'			      = $Olicense
-			'Total Amount'	      = $TotalAmount
-			'Assigned Licenses'   = $Assigned
-			'Unassigned Licenses' = $Unassigned
+		$OUwithLinked++
+		$GPOs = $OU.linkedgrouppolicyobjects
+		foreach ($GPO in $GPOs)
+		{
+			$Split1 = $GPO -split "{" | Select-Object -Last 1
+			$Split2 = $Split1 -split "}" | Select-Object -First 1
+			$LinkedGPOs.add((Get-GPO -Guid $Split2 -ErrorAction SilentlyContinue).DisplayName )
 		}
 		
-		$licensetable.add($obj)
+		
 	}
+	
+	
+	$LinkedGPOs = $LinkedGPOs -join ", "
+	$obj = [PSCustomObject]@{
+		'Name'			      = $OU.Name
+		'Linked GPOs'	      = $LinkedGPOs
+		'Modified Date'		  = $OU.WhenChanged
+		'Protected from Deletion' = $OU.ProtectedFromAccidentalDeletion
+	}
+	
+	$OUTable.add($obj)
+	
 }
-If (($licensetable).count -eq 0)
+If (($OUTable).count -eq 0)
 {
-	$licensetable = [PSCustomObject]@{
+	$OUTable = [PSCustomObject]@{
 		'Information' = 'Information: No Licenses were found in the tenant'
 	}
 }
 
 
-$IsLicensed = ($AllUsers | Where-Object { $_.assignedlicenses.count -gt 0 }).Count
-$objULic = [PSCustomObject]@{
-	'Name'  = 'Users Licensed'
-	'Count' = $IsLicensed
+#OUs with no GPO Linked
+$obj1 = [PSCustomObject]@{
+	'Name'  = "OU's with no GPO's linked"
+	'Count' = $OUwithnoLink
 }
 
-$IsLicensedUsersTable.add($objULic)
+$OUGPOTable.add($obj1)
 
-$ISNotLicensed = ($AllUsers | Where-Object { $_.assignedlicenses.count -eq 0 }).Count
-$objULic = [PSCustomObject]@{
-	'Name'  = 'Users Not Licensed'
-	'Count' = $IsNotLicensed
+$obj2 = [PSCustomObject]@{
+	'Name'  = "OU's with GPO's linked"
+	'Count' = $OUwithLinked
 }
 
-$IsLicensedUsersTable.add($objULic)
-If (($IsLicensedUsersTable).count -eq 0)
-{
-	$IsLicensedUsersTable = [PSCustomObject]@{
-		'Information' = 'Information: No Licenses were found in the tenant'
-	}
-}
+$OUGPOTable.add($obj2)
+
+
+
+<###########################
+           USERS
+############################>
+$UserEnabled 	= 0
+$UserDisabled 	= 0
+$UserPasswordExpires = 0
+$UserPasswordNeverExpires = 0
 
 Foreach ($User in $AllUsers)
 {
-	$ProxyA = New-Object 'System.Collections.Generic.List[System.Object]'
-	$NewObject02 = New-Object 'System.Collections.Generic.List[System.Object]'
-	$NewObject01 = New-Object 'System.Collections.Generic.List[System.Object]'
-	$UserLicenses = ($user | Select-Object -ExpandProperty AssignedLicenses).SkuID
-	If (($UserLicenses).count -gt 1)
+	
+	$AttVar = get-aduser -filter {name -eq $User.Name} -Properties * | Select-Object Enabled,PasswordExpired, PasswordLastSet, PasswordNeverExpires, PasswordNotRequired, Name, SamAccountName, EmailAddress, AccountExpirationDate, @{ Name = 'lastlogon'; Expression = { LastLogonConvert $_.lastlogon } }, DistinguishedName
+	
+	$maxPasswordAge = (Get-ADDefaultDomainPasswordPolicy).MaxPasswordAge
+	
+	If ((($AttVar.PasswordNeverExpires) -eq $False) -and (($AttVar.Enabled) -ne $false))
 	{
-		Foreach ($UserLicense in $UserLicenses)
+		#Get Password last set date
+		$passwordSetDate = (Get-ADUser $user -properties * | ForEach-Object { $_.PasswordLastSet })
+		If ($null -eq $passwordSetDate)
 		{
-			$UserLicense = ($licenses | Where-Object { $_.skuid -match $UserLicense }).SkuPartNumber
-			$TextLic = $Sku.Item("$UserLicense")
-			If (!($TextLic))
-			{
-				$NewObject01 = [PSCustomObject]@{
-					'Licenses' = $UserLicense
-				}
-				$NewObject02.add($NewObject01)
-			}
-			Else
-			{
-				$NewObject01 = [PSCustomObject]@{
-					'Licenses' = $textlic
-				}
-				
-				$NewObject02.add($NewObject01)
-			}
-		}
-	}
-	Elseif (($UserLicenses).count -eq 1)
-	{
-		$lic = ($licenses | Where-Object { $_.skuid -match $UserLicenses }).SkuPartNumber
-		$TextLic = $Sku.Item("$lic")
-		If (!($TextLic))
-		{
-			$NewObject01 = [PSCustomObject]@{
-				'Licenses' = $lic
-			}
-			$NewObject02.add($NewObject01)
+			$daystoexpire = "User has never logged on"
 		}
 		Else
 		{
-			$NewObject01 = [PSCustomObject]@{
-				'Licenses' = $textlic
+			#Check for Fine Grained Passwords
+			$PasswordPol = (Get-ADUserResultantPasswordPolicy $user)
+			if (($PasswordPol) -ne $null)
+			{
+				$maxPasswordAge = ($PasswordPol).MaxPasswordAge
 			}
-			$NewObject02.add($NewObject01)
-		}
-	}
-	Else
-	{
-		$NewObject01 = [PSCustomObject]@{
-			'Licenses' = $Null
-		}
-		$NewObject02.add($NewObject01)
-	}
-	
-	$ProxyAddresses = ($User | Select-Object -ExpandProperty ProxyAddresses)
-	If ($ProxyAddresses -ne $Null)
-	{
-		Foreach ($Proxy in $ProxyAddresses)
-		{
-			$ProxyB = $Proxy -split ":" | Select-Object -Last 1
-			$ProxyA.add($ProxyB)
+			
+			$expireson = $passwordsetdate + $maxPasswordAge
+			$today = (get-date)
+			#Gets the count on how many days until the password expires and stores it in the $daystoexpire var
+			$daystoexpire = (New-TimeSpan -Start $today -End $Expireson).Days
 			
 		}
-		$ProxyC = $ProxyA -join ", "
 	}
 	Else
 	{
-		$ProxyC = $Null
+		
+		$daystoexpire = "N/A"
+		
 	}
 	
-	$Name = $User.DisplayName
-	$UPN = $User.UserPrincipalName
-	$UserLicenses = ($NewObject02 | Select-Object -ExpandProperty Licenses) -join ", "
-	$Enabled = $User.AccountEnabled
-	$ResetPW = Get-User $User.DisplayName | Select-Object -ExpandProperty ResetPasswordOnNextLogon
-	
-	If ($IncludeLastLogonTimestamp -eq $True)
+	#Get users that haven't logged on in X amount of days, var is set at start of script
+	If (($User.Enabled -eq $True) -and ($User.LastLogonDate -lt (Get-Date).AddDays(-$Days)) -and ($User.LastLogonDate -ne $NULL))
 	{
-		$LastLogon = Get-Mailbox $User.DisplayName | Get-MailboxStatistics -ErrorAction SilentlyContinue | Select-Object -ExpandProperty LastLogonTime -ErrorAction SilentlyContinue
 		$obj = [PSCustomObject]@{
-			'Name'						   = $Name
-			'UserPrincipalName'		       = $UPN
-			'Licenses'					   = $UserLicenses
-			'Last Mailbox Logon'		   = $LastLogon
-			'Reset Password at Next Logon' = $ResetPW
-			'Enabled'					   = $Enabled
-			'E-mail Addresses'			   = $ProxyC
+			'Name'					      = $User.Name
+			'UserPrincipalName'		      = $User.UserPrincipalName
+			'Enabled'					  = $AttVar.Enabled
+			'Last Logon'				  = $AttVar.lastlogon
+			'Password Never Expires' = $AttVar.PasswordNeverExpires
+			'Days Until Password Expires' = $daystoexpire
 		}
+		$userphaventloggedonrecentlytable.add($obj)
+	}
+	If (($userphaventloggedonrecentlytable).count -eq 0)
+	{
+		$userphaventloggedonrecentlytable = [PSCustomObject]@{
+			'Information' = "Information: No Users were found to have not logged on in $Days days"
+		}
+	}
+	
+	#Items for the enabled vs disabled users pie chart
+	If (($AttVar.PasswordNeverExpires) -ne $false)
+	{
+		$UserPasswordNeverExpires++
 	}
 	Else
 	{
-		$obj = [PSCustomObject]@{
-			'Name'						   = $Name
-			'UserPrincipalName'		       = $UPN
-			'Licenses'					   = $UserLicenses
-			'Reset Password at Next Logon' = $ResetPW
-			'Enabled'					   = $Enabled
-			'E-mail Addresses'			   = $ProxyC
-		}
+		$UserPasswordExpires++
 	}
 	
+	#Items for password expiration pie chart
+	If (($AttVar.Enabled) -ne $false)
+	{
+		$UserEnabled++
+	}
+	Else
+	{
+		$UserDisabled++
+	}
+	
+	
+	
+	
+	
+	$Name 					= $User.Name
+	$UPN 					= $User.UserPrincipalName
+	$Enabled 				= $AttVar.Enabled
+	$LastLogon 				= $AttVar.lastlogon
+	$EmailAddress 			= $AttVar.EmailAddress
+	$AccountExpiration 		= $AttVar.AccountExpirationDate
+	$PasswordExpired 		= $AttVar.PasswordExpired
+	$PasswordLastSet 		= $AttVar.PasswordLastSet
+	$PasswordNeverExpires 	= $AttVar.PasswordNeverExpires
+	$daysUntilPWExpire 		= $daystoexpire
+
+	#lastpasswordchange
+	#reset password on expiration
+	
+	
+	
+	$obj = [PSCustomObject]@{
+		'Name'						   	= $Name
+		'UserPrincipalName'		       	= $UPN
+		'Enabled'						= $Enabled
+		'Last Logon'				   	= $LastLogon
+		'Email Address' 				= $EmailAddress
+		'Account Expiration'			= $AccountExpiration
+		'Change Password Next Logon'  	= $PasswordExpired
+		'Password Last Set'  			= $PasswordLastSet
+		'Password Never Expires' 		= $PasswordNeverExpires
+		'Days Until Password Expires'   = $daystoexpire
+	}
 	$usertable.add($obj)
+	
+	If ($daystoexpire -lt 8)
+	{
+		$obj = [PSCustomObject]@{
+			'Name'					      = $Name
+			'Days Until Password Expires' = $daystoexpire
+		}
+		$PasswordExpireSoonTable.add($obj)
+	}
 }
 If (($usertable).count -eq 0)
 {
 	$usertable = [PSCustomObject]@{
-		'Information' = 'Information: No Users were found in the tenant'
+		'Information' = 'Information: No Users were found'
 	}
 }
+
+
+#Data for users enabled vs disabled pie graph
+$objULic = [PSCustomObject]@{
+	'Name'  = 'Enabled'
+	'Count' = $UserEnabled
+}
+
+$EnabledDisabledUsersTable.add($objULic)
+
+
+$objULic = [PSCustomObject]@{
+	'Name'  = 'Disabled'
+	'Count' = $UserDisabled
+}
+
+$EnabledDisabledUsersTable.add($objULic)
+
+
+#Data for users password expires pie graph
+$objULic = [PSCustomObject]@{
+	'Name'  = 'Password Expires'
+	'Count' = $UserPasswordExpires
+}
+
+$PasswordExpirationTable.add($objULic)
+
+
+$objULic = [PSCustomObject]@{
+	'Name'  = 'Password Never Expires'
+	'Count' = $UserPasswordNeverExpires
+}
+
+$PasswordExpirationTable.add($objULic)
+
 
 
 #Get all Shared Mailboxes
@@ -689,45 +815,28 @@ If (($EquipTable).count -eq 0)
 
 
 
-$tabarray = @('Dashboard', 'Groups', 'Licenses', 'Users', 'Shared Mailboxes', 'Contacts', 'Resources')
+$tabarray = @('Dashboard', 'Groups', 'Organizational Units', 'Users', 'Shared Mailboxes', 'Contacts', 'Resources')
+
+
 
 #basic Properties 
-$PieObject2 = Get-HTMLPieChartObject
-$PieObject2.Title = "Office 365 Total Licenses"
-$PieObject2.Size.Height = 250
-$PieObject2.Size.width = 250
-$PieObject2.ChartStyle.ChartType = 'doughnut'
+$PieObjectOUGPOLinks = Get-HTMLPieChartObject
+$PieObjectOUGPOLinks.Title = "OU GPO Links"
+$PieObjectOUGPOLinks.Size.Height = 250
+$PieObjectOUGPOLinks.Size.width = 250
+$PieObjectOUGPOLinks.ChartStyle.ChartType = 'doughnut'
 
 #These file exist in the module directoy, There are 4 schemes by default
-$PieObject2.ChartStyle.ColorSchemeName = "ColorScheme4"
+$PieObjectOUGPOLinks.ChartStyle.ColorSchemeName = "ColorScheme4"
 #There are 8 generated schemes, randomly generated at runtime 
-$PieObject2.ChartStyle.ColorSchemeName = "Generated7"
+$PieObjectOUGPOLinks.ChartStyle.ColorSchemeName = "Generated5"
 #you can also ask for a random scheme.  Which also happens if you have too many records for the scheme
-$PieObject2.ChartStyle.ColorSchemeName = 'Random'
+$PieObjectOUGPOLinks.ChartStyle.ColorSchemeName = 'Random'
 
 #Data defintion you can reference any column from name and value from the  dataset.  
 #Name and Count are the default to work with the Group function.
-$PieObject2.DataDefinition.DataNameColumnName = 'Name'
-$PieObject2.DataDefinition.DataValueColumnName = 'Total Amount'
-
-#basic Properties 
-$PieObject3 = Get-HTMLPieChartObject
-$PieObject3.Title = "Office 365 Assigned Licenses"
-$PieObject3.Size.Height = 250
-$PieObject3.Size.width = 250
-$PieObject3.ChartStyle.ChartType = 'doughnut'
-
-#These file exist in the module directoy, There are 4 schemes by default
-$PieObject3.ChartStyle.ColorSchemeName = "ColorScheme4"
-#There are 8 generated schemes, randomly generated at runtime 
-$PieObject3.ChartStyle.ColorSchemeName = "Generated5"
-#you can also ask for a random scheme.  Which also happens if you have too many records for the scheme
-$PieObject3.ChartStyle.ColorSchemeName = 'Random'
-
-#Data defintion you can reference any column from name and value from the  dataset.  
-#Name and Count are the default to work with the Group function.
-$PieObject3.DataDefinition.DataNameColumnName = 'Name'
-$PieObject3.DataDefinition.DataValueColumnName = 'Assigned Licenses'
+$PieObjectOUGPOLinks.DataDefinition.DataNameColumnName = 'Name'
+$PieObjectOUGPOLinks.DataDefinition.DataValueColumnName = 'Count'
 
 #basic Properties 
 $PieObject4 = Get-HTMLPieChartObject
@@ -755,10 +864,21 @@ $PieObjectGroupType.Size.Height = 250
 $PieObjectGroupType.Size.width = 250
 $PieObjectGroupType.ChartStyle.ChartType = 'doughnut'
 
+#Pie Chart Groups with members vs no members
+$PieObjectGroupMembersType = Get-HTMLPieChartObject
+$PieObjectGroupMembersType.Title = "Group Membership"
+$PieObjectGroupMembersType.Size.Height = 250
+$PieObjectGroupMembersType.Size.width = 250
+$PieObjectGroupMembersType.ChartStyle.ChartType = 'doughnut'
+$PieObjectGroupMembersType.ChartStyle.ColorSchemeName = "ColorScheme4"
+$PieObjectGroupMembersType.ChartStyle.ColorSchemeName = "Generated8"
+$PieObjectGroupMembersType.ChartStyle.ColorSchemeName = 'Random'
+$PieObjectGroupMembersType.DataDefinition.DataNameColumnName = 'Name'
+$PieObjectGroupMembersType.DataDefinition.DataValueColumnName = 'Count'
 
 #basic Properties 
 $PieObjectGroupType2 = Get-HTMLPieChartObject
-$PieObjectGroupType2.Title = "Custom vs Default"
+$PieObjectGroupType2.Title = "Custom vs Default Groups"
 $PieObjectGroupType2.Size.Height = 250
 $PieObjectGroupType2.Size.width = 250
 $PieObjectGroupType2.ChartStyle.ChartType = 'doughnut'
@@ -776,29 +896,47 @@ $PieObjectGroupType.ChartStyle.ColorSchemeName = 'Random'
 $PieObjectGroupType.DataDefinition.DataNameColumnName = 'Name'
 $PieObjectGroupType.DataDefinition.DataValueColumnName = 'Count'
 
-##--LICENSED AND UNLICENSED USERS PIE CHART--##
+##--Enabled users vs Disabled Users PIE CHART--##
 #basic Properties 
-$PieObjectULicense = Get-HTMLPieChartObject
-$PieObjectULicense.Title = "License Status"
-$PieObjectULicense.Size.Height = 250
-$PieObjectULicense.Size.width = 250
-$PieObjectULicense.ChartStyle.ChartType = 'doughnut'
-
+$EnabledDisabledUsersPieObject = Get-HTMLPieChartObject
+$EnabledDisabledUsersPieObject.Title = "Enabled vs Disabled Users"
+$EnabledDisabledUsersPieObject.Size.Height = 250
+$EnabledDisabledUsersPieObject.Size.width = 250
+$EnabledDisabledUsersPieObject.ChartStyle.ChartType = 'doughnut'
 #These file exist in the module directoy, There are 4 schemes by default
-$PieObjectULicense.ChartStyle.ColorSchemeName = "ColorScheme3"
+$EnabledDisabledUsersPieObject.ChartStyle.ColorSchemeName = "ColorScheme3"
 #There are 8 generated schemes, randomly generated at runtime 
-$PieObjectULicense.ChartStyle.ColorSchemeName = "Generated3"
+$EnabledDisabledUsersPieObject.ChartStyle.ColorSchemeName = "Generated3"
 #you can also ask for a random scheme.  Which also happens if you have too many records for the scheme
-$PieObjectULicense.ChartStyle.ColorSchemeName = 'Random'
-
+$EnabledDisabledUsersPieObject.ChartStyle.ColorSchemeName = 'Random'
 #Data defintion you can reference any column from name and value from the  dataset.  
 #Name and Count are the default to work with the Group function.
-$PieObjectULicense.DataDefinition.DataNameColumnName = 'Name'
-$PieObjectULicense.DataDefinition.DataValueColumnName = 'Count'
+$EnabledDisabledUsersPieObject.DataDefinition.DataNameColumnName = 'Name'
+$EnabledDisabledUsersPieObject.DataDefinition.DataValueColumnName = 'Count'
 
+
+##--PasswordNeverExpires PIE CHART--##
+#basic Properties 
+$PWExpiresUsersTable = Get-HTMLPieChartObject
+$PWExpiresUsersTable.Title = "Password Expiration"
+$PWExpiresUsersTable.Size.Height = 250
+$PWExpiresUsersTable.Size.width = 250
+$PWExpiresUsersTable.ChartStyle.ChartType = 'doughnut'
+#These file exist in the module directoy, There are 4 schemes by default
+$PWExpiresUsersTable.ChartStyle.ColorSchemeName = "ColorScheme3"
+#There are 8 generated schemes, randomly generated at runtime 
+$PWExpiresUsersTable.ChartStyle.ColorSchemeName = "Generated3"
+#you can also ask for a random scheme.  Which also happens if you have too many records for the scheme
+$PWExpiresUsersTable.ChartStyle.ColorSchemeName = 'Random'
+#Data defintion you can reference any column from name and value from the  dataset.  
+#Name and Count are the default to work with the Group function.
+$PWExpiresUsersTable.DataDefinition.DataNameColumnName = 'Name'
+$PWExpiresUsersTable.DataDefinition.DataValueColumnName = 'Count'
+
+
+#Dashboard Report
 $rpt = New-Object 'System.Collections.Generic.List[System.Object]'
-$rpt += get-htmlopenpage -TitleText $ReportTitle -LeftLogoString $CompanyLogo -RightLogoString $RightLogo
-
+$rpt += get-htmlopenpage -TitleText $ReportTitle -LeftLogoString $CompanyLogo -RightLogoString $RightLogo -CSSName ymca
 $rpt += Get-HTMLTabHeader -TabNames $tabarray
 	$rpt += get-htmltabcontentopen -TabName $tabarray[0] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
 		$rpt += Get-HtmlContentOpen -HeaderText "Dashboard"
@@ -827,40 +965,86 @@ $rpt += Get-HTMLTabHeader -TabNames $tabarray
 	$rpt += Get-HtmlContentClose
 $rpt += get-htmltabcontentclose
 
+#Groups Report
 $rpt += get-htmltabcontentopen -TabName $tabarray[1] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
 	$rpt += Get-HTMLContentOpen -HeaderText "Active Directory Groups"
 		$rpt += get-htmlcontentdatatable $Table -HideFooter
 	$rpt += Get-HTMLContentClose
+
+$rpt += get-HtmlColumn1of2
+$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText 'Domain Administrators'
+$rpt += get-htmlcontentdatatable $DomainAdminTable -HideFooter
+$rpt += Get-HtmlContentClose
+$rpt += get-htmlColumnClose
+$rpt += get-htmlColumn2of2
+$rpt += Get-HtmlContentOpen -HeaderText 'Enterprise Administrators'
+$rpt += get-htmlcontentdatatable $EnterpriseAdminTable -HideFooter
+$rpt += Get-HtmlContentClose
+$rpt += get-htmlColumnClose
+
+	
 	$rpt += Get-HTMLContentOpen -HeaderText "Active Directory Groups Chart"
-		$rpt += Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 2
+		$rpt += Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 3
 			$rpt += Get-HTMLPieChart -ChartObject $PieObjectGroupType -DataSet $GroupTypetable
 		$rpt += Get-HTMLColumnClose
-		$rpt += Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 2
+		$rpt += Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 3
 			$rpt += Get-HTMLPieChart -ChartObject $PieObjectGroupType2 -DataSet $DefaultGrouptable
+		$rpt += Get-HTMLColumnClose
+		$rpt += Get-HTMLColumnOpen -ColumnNumber 3 -ColumnCount 3
+			$rpt += Get-HTMLPieChart -ChartObject $PieObjectGroupMembersType -DataSet $GroupMembershipTable
 		$rpt += Get-HTMLColumnClose
 	$rpt += Get-HTMLContentClose
 $rpt += get-htmltabcontentclose
+
+#Organizational Unit Report
 $rpt += get-htmltabcontentopen -TabName $tabarray[2] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
-	$rpt += Get-HTMLContentOpen -HeaderText "Office 365 Licenses"
-$rpt += get-htmlcontentdatatable $LicenseTable -HideFooter
-$rpt += Get-HTMLContentClose
-$rpt += Get-HTMLContentOpen -HeaderText "Office 365 Licensing Charts"
-$rpt += Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 2
-$rpt += Get-HTMLPieChart -ChartObject $PieObject2 -DataSet $GroupTypetable #$licensetable
-$rpt += Get-HTMLColumnClose
-$rpt += Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 2
-$rpt += Get-HTMLPieChart -ChartObject $PieObject3 -DataSet $DefaultGrouptable #$licensetable
-$rpt += Get-HTMLColumnClose
-$rpt += Get-HTMLContentclose
+	$rpt += Get-HTMLContentOpen -HeaderText "Organizational Units"
+		$rpt += get-htmlcontentdatatable $OUTable -HideFooter
+	$rpt += Get-HTMLContentClose
+	$rpt += Get-HTMLContentOpen -HeaderText "Organizational Units Charts"
+		$rpt += Get-HTMLPieChart -ChartObject $PieObjectOUGPOLinks -DataSet $OUGPOTable
+	$rpt += Get-HTMLContentclose
 $rpt += get-htmltabcontentclose
+
+#Users Report
 $rpt += get-htmltabcontentopen -TabName $tabarray[3] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
-$rpt += Get-HTMLContentOpen -HeaderText "Office 365 Users"
-$rpt += get-htmlcontentdatatable $UserTable -HideFooter
-$rpt += Get-HTMLContentClose
-$rpt += Get-HTMLContentOpen -HeaderText "Licensed & Unlicensed Users Chart"
-$rpt += Get-HTMLPieChart -ChartObject $PieObjectULicense -DataSet $IsLicensedUsersTable
-$rpt += Get-HTMLContentClose
+	$rpt += Get-HTMLContentOpen -HeaderText "Active Directory Users"
+		$rpt += get-htmlcontentdatatable $UserTable -HideFooter
+	$rpt += Get-HTMLContentClose
+
+$rpt += get-HtmlColumn1of2
+$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText 'Users with Passwords Expiring in a Week or less'
+$rpt += get-htmlcontentdatatable $PasswordExpireSoonTable -HideFooter
+$rpt += Get-HtmlContentClose
+$rpt += get-htmlColumnClose
+$rpt += get-htmlColumn2of2
+$rpt += Get-HtmlContentOpen -HeaderText 'Accounts Expiring Soon'
+$rpt += get-htmlcontentdatatable $ExpiringAccountsTable -HideFooter
+$rpt += Get-HtmlContentClose
+$rpt += get-htmlColumnClose
+
+$rpt += get-HtmlColumn1of2
+$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days"
+$rpt += get-htmlcontentdatatable $userphaventloggedonrecentlytable -HideFooter
+$rpt += Get-HtmlContentClose
+$rpt += get-htmlColumnClose
+$rpt += get-htmlColumn2of2
+$rpt += Get-HtmlContentOpen -HeaderText 'Accounts Expiring Soon'
+$rpt += get-htmlcontentdatatable $ExpiringAccountsTable -HideFooter
+$rpt += Get-HtmlContentClose
+$rpt += get-htmlColumnClose
+
+	$rpt += Get-HTMLContentOpen -HeaderText "Users Charts"
+		$rpt += Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 2
+		$rpt += Get-HTMLPieChart -ChartObject $EnabledDisabledUsersPieObject -DataSet $EnabledDisabledUsersTable
+	$rpt += Get-HTMLColumnClose
+	$rpt += Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 2
+		$rpt += Get-HTMLPieChart -ChartObject $PWExpiresUsersTable -DataSet $PasswordExpirationTable
+	$rpt += Get-HTMLColumnClose
+
+	$rpt += Get-HTMLContentClose
 $rpt += get-htmltabcontentclose
+
 $rpt += get-htmltabcontentopen -TabName $tabarray[4] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
 $rpt += Get-HTMLContentOpen -HeaderText "Office 365 Shared Mailboxes"
 $rpt += get-htmlcontentdatatable $SharedMailboxTable -HideFooter
