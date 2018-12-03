@@ -129,11 +129,11 @@ $OUProtectionTable 					= New-Object 'System.Collections.Generic.List[System.Obj
 $GPOTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $ADObjectTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $ProtectedUsersTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$ComputersTable = New-Object 'System.Collections.Generic.List[System.Object]'
 
 # Get all users right away. Instead of doing several lookups, we will use this object to look up all the information needed.
 $AllUsers = Get-ADUser -Filter * -Properties *
 $GPOs = Get-GPO -all | Select-Object DisplayName, GPOStatus, ModificationTime, @{ Label = "ComputerVersion"; Expression = { $_.computer.dsversion } }, @{ Label = "UserVersion"; Expression = { $_.user.dsversion } }
-
 
 <###########################
          Dashboard
@@ -826,8 +826,34 @@ foreach ($GPO in $GPOs)
 }
 
 
+<###########################
+         Computers
+############################>
+$Computers = Get-ADComputer -filter * -properties *
+foreach ($Computer in $Computers)
+{
+	$obj = [PSCustomObject]@{
+		'Name' = $Computer.Name
+		'Enabled' = $Computer.Enabled
+		'Operating System' = $Computer.OperatingSystem
+		'Modified Date' = $Computer.Modified
+		'Password Last Set' = $Computer.PasswordLastSet
+		'Protect from Deletion' = $Computer.ProtectedFromAccidentalDeletion
 
-$tabarray = @('Dashboard', 'Groups', 'Organizational Units', 'Users', 'Group Policy')
+	}
+	
+	$ComputersTable.add($obj)
+	
+}
+If (($ComputersTable).count -eq 0)
+{
+	$ComputersTable = [PSCustomObject]@{
+		'Information' = 'Information: No Computers were found'
+	}
+}
+
+
+$tabarray = @('Dashboard', 'Groups', 'Organizational Units', 'Users', 'Group Policy', 'Computers')
 
 ##--OU Protection PIE CHART--##
 #basic Properties 
@@ -1037,17 +1063,24 @@ $rpt += Get-HTMLContentOpen -HeaderText "AD Objects Modified in Last $ADNumber D
 $rpt += Get-HtmlContentTable $ADObjectTable
 $rpt += Get-HTMLContentClose
 
-$rpt += Get-HtmlContentOpen -HeaderText "Accounts"
+$rpt += Get-HtmlContentOpen -HeaderText "Expiring Items"
+
 $rpt += get-HtmlColumn1of2
-$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Accounts Created in $UserCreatedDays Days or Less"
-$rpt += get-htmlcontentdatatable $NewCreatedUsersTable -HideFooter
+$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Users with Passwords Expiring in less than $DaysUntilPWExpireINT days"
+$rpt += get-htmlcontentdatatable $PasswordExpireSoonTable -HideFooter
 $rpt += Get-HtmlContentClose
 $rpt += get-htmlColumnClose
+
 $rpt += get-htmlColumn2of2
 $rpt += Get-HtmlContentOpen -HeaderText 'Accounts Expiring Soon'
 $rpt += get-htmlcontentdatatable $ExpiringAccountsTable -HideFooter
 $rpt += Get-HtmlContentClose
 $rpt += get-htmlColumnClose
+
+$rpt += Get-HtmlContentClose
+
+
+$rpt += Get-HtmlContentOpen -HeaderText "Accounts"
 
 $rpt += get-HtmlColumn1of2
 $rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days"
@@ -1055,8 +1088,8 @@ $rpt += get-htmlcontentdatatable $userphaventloggedonrecentlytable -HideFooter
 $rpt += Get-HtmlContentClose
 $rpt += get-htmlColumnClose
 $rpt += get-htmlColumn2of2
-$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Users with Passwords Expiring in less than $DaysUntilPWExpireINT days"
-$rpt += get-htmlcontentdatatable $PasswordExpireSoonTable -HideFooter
+$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Accounts Created in $UserCreatedDays Days or Less"
+$rpt += get-htmlcontentdatatable $NewCreatedUsersTable -HideFooter
 $rpt += Get-HtmlContentClose
 $rpt += get-htmlColumnClose
 
@@ -1132,7 +1165,7 @@ $rpt += get-htmltabcontentopen -TabName $tabarray[3] -TabHeading ("Report: " + (
 		$rpt += get-htmlcontentdatatable $UserTable -HideFooter
 	$rpt += Get-HTMLContentClose
 
-$rpt += Get-HtmlContentOpen -HeaderText "Accounts"
+$rpt += Get-HtmlContentOpen -HeaderText "Expiring Items"
 $rpt += get-HtmlColumn1of2
 $rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Accounts Created in $UserCreatedDays Days or Less"
 $rpt += get-htmlcontentdatatable $NewCreatedUsersTable -HideFooter
@@ -1144,6 +1177,11 @@ $rpt += get-htmlcontentdatatable $ExpiringAccountsTable -HideFooter
 $rpt += Get-HtmlContentClose
 $rpt += get-htmlColumnClose
 
+$rpt += Get-HtmlContentClose
+
+
+
+$rpt += Get-HtmlContentOpen -HeaderText "Accounts"
 $rpt += get-HtmlColumn1of2
 $rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days"
 $rpt += get-htmlcontentdatatable $userphaventloggedonrecentlytable -HideFooter
@@ -1174,11 +1212,19 @@ $rpt += Get-HTMLColumnClose
 	$rpt += Get-HTMLContentClose
 $rpt += get-htmltabcontentclose
 
-
+#GPO Report
 $rpt += get-htmltabcontentopen -TabName $tabarray[4] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
 $rpt += Get-HTMLContentOpen -HeaderText "Group Policies"
 $rpt += get-htmlcontentdatatable $GPOTable -HideFooter
 $rpt += Get-HTMLContentClose
+$rpt += get-htmltabcontentclose
+
+#Computers Report
+$rpt += get-htmltabcontentopen -TabName $tabarray[5] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
+$rpt += Get-HTMLContentOpen -HeaderText "Computers"
+$rpt += get-htmlcontentdatatable $ComputersTable -HideFooter
+$rpt += Get-HTMLContentClose
+$rpt += get-htmltabcontentclose
 
 $rpt += Get-HTMLClosePage
 
