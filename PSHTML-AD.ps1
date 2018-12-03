@@ -132,6 +132,8 @@ $ProtectedUsersTable = New-Object 'System.Collections.Generic.List[System.Object
 $ComputersTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $ComputerProtectedTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $ComputersEnabledTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$DefaultComputersinDefaultOUTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$DefaultUsersinDefaultOUTable = New-Object 'System.Collections.Generic.List[System.Object]'
 
 # Get all users right away. Instead of doing several lookups, we will use this object to look up all the information needed.
 $AllUsers = Get-ADUser -Filter * -Properties *
@@ -257,7 +259,41 @@ Foreach ($EnterpriseAdminsMember in $EnterpriseAdminsMembers)
 	
 }
 
+$DefaultComputersOU = (Get-ADDomain).computerscontainer
+$DefaultComputers = Get-ADComputer -Filter * -Properties * -SearchBase "$DefaultComputersOU"
+foreach ($DefaultComputer in $DefaultComputers)
+{
+	$obj = [PSCustomObject]@{
+		'Name' = $DefaultComputer.Name
+		'Enabled' = $DefaultComputer.Enabled
+		'Operating System' = $DefaultComputer.OperatingSystem
+		'Modified Date' = $DefaultComputer.Modified
+		'Password Last Set' = $DefaultComputer.PasswordLastSet
+		'Protect from Deletion' = $DefaultComputer.ProtectedFromAccidentalDeletion
+	}
+	
+	
+	$DefaultComputersinDefaultOUTable.add($obj)
+	
+}
 
+$DefaultUsersOU = (Get-ADDomain).userscontainer
+$DefaultUsers = Get-ADUser -Filter * -Properties * -SearchBase "$DefaultUsersOU" | Select-Object Name, UserPrincipalName, Enabled, ProtectedFromAccidentalDeletion, EmailAddress, @{ Name = 'lastlogon'; Expression = { LastLogonConvert $_.lastlogon } }, DistinguishedName
+foreach ($DefaultUser in $DefaultUsers)
+{
+	$obj = [PSCustomObject]@{
+		'Name' = $DefaultUser.Name
+		'UserPrincipalName' = $DefaultUser.UserPrincipalName
+		'Enabled' = $DefaultUser.Enabled
+		'Protected from Deletion' = $DefaultUser.ProtectedFromAccidentalDeletion
+		'Last Logon' = $DefaultUser.LastLogon
+		'Email Address' = $DefaultUser.EmailAddress
+
+	}
+	
+	
+	$DefaultUsersinDefaultOUTable.add($obj)
+}
 
 #Expiring Accounts
 $LooseUsers = Search-ADAccount -AccountExpiring -UsersOnly 
@@ -1154,6 +1190,20 @@ $rpt += get-htmlcontentdatatable $EnterpriseAdminTable -HideFooter
 $rpt += Get-HtmlContentClose
 $rpt += get-htmlColumnClose
 $rpt += Get-HtmlContentClose
+
+$rpt += Get-HtmlContentOpen -HeaderText "Objects in Default OUs"
+$rpt += get-HtmlColumn1of2
+$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText 'Computers'
+$rpt += get-htmlcontentdatatable $DefaultComputersinDefaultOUTable -HideFooter
+$rpt += Get-HtmlContentClose
+$rpt += get-htmlColumnClose
+$rpt += get-htmlColumn2of2
+$rpt += Get-HtmlContentOpen -HeaderText 'Users'
+$rpt += get-htmlcontentdatatable $DefaultUsersinDefaultOUTable -HideFooter
+$rpt += Get-HtmlContentClose
+$rpt += get-htmlColumnClose
+$rpt += Get-HtmlContentClose
+
 
 $rpt += Get-HTMLContentOpen -HeaderText "AD Objects Modified in Last $ADNumber Days"
 $rpt += get-htmlcontentdatatable $ADObjectTable
