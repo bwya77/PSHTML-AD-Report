@@ -34,6 +34,10 @@ $DaysUntilPWExpireINT = 7
 #Get AD Objects that have been modified in X days and newer
 $ADNumber = 3
 
+#CSS templatee located C:\Program Files\WindowsPowerShell\Modules\ReportHTML\1.4.1.1\
+#Default template is orange and named "Sample"
+$CssName = "psm"
+
 ########################################
 #Check for ReportHTML Module
 $Mod = get-module -ListAvailable -Name "ReportHTML"
@@ -1003,7 +1007,7 @@ $PieObjectGroupProtection.DataDefinition.DataValueColumnName = 'Count'
 
 
 $rpt = New-Object 'System.Collections.Generic.List[System.Object]'
-$rpt += get-htmlopenpage -TitleText $ReportTitle -LeftLogoString $CompanyLogo -RightLogoString $RightLogo -CSSName ymca
+$rpt += get-htmlopenpage -TitleText $ReportTitle -LeftLogoString $CompanyLogo -RightLogoString $RightLogo -CSSName $CssName
 $rpt += Get-HTMLTabHeader -TabNames $tabarray
 
 
