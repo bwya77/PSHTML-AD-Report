@@ -1313,8 +1313,8 @@ $rpt += get-htmltabcontentopen -TabName $tabarray[3] -TabHeading ("Report: " + (
 
 $rpt += Get-HtmlContentOpen -HeaderText "Expiring Items"
 $rpt += get-HtmlColumn1of2
-$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Accounts Created in $UserCreatedDays Days or Less"
-$rpt += get-htmlcontentdatatable $NewCreatedUsersTable -HideFooter
+$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Users with Passwords Expiring in less than $DaysUntilPWExpireINT days"
+$rpt += get-htmlcontentdatatable $PasswordExpireSoonTable -HideFooter
 $rpt += Get-HtmlContentClose
 $rpt += get-htmlColumnClose
 $rpt += get-htmlColumn2of2
@@ -1334,8 +1334,8 @@ $rpt += get-htmlcontentdatatable $userphaventloggedonrecentlytable -HideFooter
 $rpt += Get-HtmlContentClose
 $rpt += get-htmlColumnClose
 $rpt += get-htmlColumn2of2
-$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Users with Passwords Expiring in less than $DaysUntilPWExpireINT days"
-$rpt += get-htmlcontentdatatable $PasswordExpireSoonTable -HideFooter
+$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Accounts Created in $UserCreatedDays Days or Less"
+$rpt += get-htmlcontentdatatable $NewCreatedUsersTable -HideFooter
 $rpt += Get-HtmlContentClose
 $rpt += get-htmlColumnClose
 
