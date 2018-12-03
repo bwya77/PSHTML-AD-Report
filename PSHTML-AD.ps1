@@ -130,6 +130,8 @@ $GPOTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $ADObjectTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $ProtectedUsersTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $ComputersTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$ComputerProtectedTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$ComputersEnabledTable = New-Object 'System.Collections.Generic.List[System.Object]'
 
 # Get all users right away. Instead of doing several lookups, we will use this object to look up all the information needed.
 $AllUsers = Get-ADUser -Filter * -Properties *
@@ -141,7 +143,7 @@ $GPOs = Get-GPO -all | Select-Object DisplayName, GPOStatus, ModificationTime, @
 
 
 $dte = (Get-Date).AddDays(- $ADNumber)
-$ADObjs = Get-ADObject -Filter 'whenchanged -gt $dte' -Properties *
+$ADObjs = Get-ADObject -Filter { whenchanged -gt $dte -and ObjectClass -ne "domainDNS" -and ObjectClass -ne "rIDManager" -and ObjectClass -ne "rIDSet" } -Properties *
 foreach ($ADObj in $ADObjs)
 {
 	If ($ADObj.ObjectClass -eq "GroupPolicyContainer")
@@ -830,8 +832,31 @@ foreach ($GPO in $GPOs)
          Computers
 ############################>
 $Computers = Get-ADComputer -filter * -properties *
+$ComputersProtected = 0
+$ComputersNotProtected = 0
+$ComputerEnabled = 0
+$ComputerDisabled = 0
 foreach ($Computer in $Computers)
 {
+	
+	If ($Computer.ProtectedFromAccidentalDeletion -eq $True)
+	{
+		$ComputersProtected++
+	}
+	Else
+	{
+		$ComputersNotProtected++
+	}
+	
+	If ($Computer.Enabled -eq $True)
+	{
+		$ComputerEnabled++
+	}
+	Else
+	{
+		$ComputerDisabled++
+	}
+	
 	$obj = [PSCustomObject]@{
 		'Name' = $Computer.Name
 		'Enabled' = $Computer.Enabled
@@ -851,6 +876,40 @@ If (($ComputersTable).count -eq 0)
 		'Information' = 'Information: No Computers were found'
 	}
 }
+
+#Data for protected Computers pie graph
+$objULic = [PSCustomObject]@{
+	'Name'  = 'Protected'
+	'Count' = $ComputerProtected
+}
+
+$ComputerProtectedTable.add($objULic)
+
+
+$objULic = [PSCustomObject]@{
+	'Name'  = 'Not Protected'
+	'Count' = $ComputersNotProtected
+}
+
+$ComputerProtectedTable.add($objULic)
+
+
+#Data for enabled/vs Computers pie graph
+$objULic = [PSCustomObject]@{
+	'Name'  = 'Enabled'
+	'Count' = $ComputerEnabled
+}
+
+$ComputersEnabledTable.add($objULic)
+
+
+$objULic = [PSCustomObject]@{
+	'Name'  = 'Disabled'
+	'Count' = $ComputerDisabled
+}
+
+$ComputersEnabledTable.add($objULic)
+
 
 
 $tabarray = @('Dashboard', 'Groups', 'Organizational Units', 'Users', 'Group Policy', 'Computers')
@@ -872,6 +931,43 @@ $PO12.ChartStyle.ColorSchemeName = 'Random'
 #Name and Count are the default to work with the Group function.
 $PO12.DataDefinition.DataNameColumnName = 'Name'
 $PO12.DataDefinition.DataValueColumnName = 'Count'
+
+##--Computers Protection PIE CHART--##
+#basic Properties 
+$PieObjectComputersProtected = Get-HTMLPieChartObject
+$PieObjectComputersProtected.Title = "Computers Protected from Deletion"
+$PieObjectComputersProtected.Size.Height = 250
+$PieObjectComputersProtected.Size.width = 250
+$PieObjectComputersProtected.ChartStyle.ChartType = 'doughnut'
+#These file exist in the module directoy, There are 4 schemes by default
+$PieObjectComputersProtected.ChartStyle.ColorSchemeName = "ColorScheme3"
+#There are 8 generated schemes, randomly generated at runtime 
+$PieObjectComputersProtected.ChartStyle.ColorSchemeName = "Generated3"
+#you can also ask for a random scheme.  Which also happens if you have too many records for the scheme
+$PieObjectComputersProtected.ChartStyle.ColorSchemeName = 'Random'
+#Data defintion you can reference any column from name and value from the  dataset.  
+#Name and Count are the default to work with the Group function.
+$PieObjectComputersProtected.DataDefinition.DataNameColumnName = 'Name'
+$PieObjectComputersProtected.DataDefinition.DataValueColumnName = 'Count'
+
+
+##--Computers Enabled PIE CHART--##
+#basic Properties 
+$PieObjectComputersEnabled = Get-HTMLPieChartObject
+$PieObjectComputersEnabled.Title = "Computers Enabled vs Disabled"
+$PieObjectComputersEnabled.Size.Height = 250
+$PieObjectComputersEnabled.Size.width = 250
+$PieObjectComputersEnabled.ChartStyle.ChartType = 'doughnut'
+#These file exist in the module directoy, There are 4 schemes by default
+$PieObjectComputersEnabled.ChartStyle.ColorSchemeName = "ColorScheme3"
+#There are 8 generated schemes, randomly generated at runtime 
+$PieObjectComputersEnabled.ChartStyle.ColorSchemeName = "Generated3"
+#you can also ask for a random scheme.  Which also happens if you have too many records for the scheme
+$PieObjectComputersEnabled.ChartStyle.ColorSchemeName = 'Random'
+#Data defintion you can reference any column from name and value from the  dataset.  
+#Name and Count are the default to work with the Group function.
+$PieObjectComputersEnabled.DataDefinition.DataNameColumnName = 'Name'
+$PieObjectComputersEnabled.DataDefinition.DataValueColumnName = 'Count'
 
 
 ##--USERS Protection PIE CHART--##
@@ -1060,7 +1156,7 @@ $rpt += get-htmlColumnClose
 $rpt += Get-HtmlContentClose
 
 $rpt += Get-HTMLContentOpen -HeaderText "AD Objects Modified in Last $ADNumber Days"
-$rpt += Get-HtmlContentTable $ADObjectTable
+$rpt += get-htmlcontentdatatable $ADObjectTable
 $rpt += Get-HTMLContentClose
 
 $rpt += Get-HtmlContentOpen -HeaderText "Expiring Items"
@@ -1224,6 +1320,17 @@ $rpt += get-htmltabcontentopen -TabName $tabarray[5] -TabHeading ("Report: " + (
 $rpt += Get-HTMLContentOpen -HeaderText "Computers"
 $rpt += get-htmlcontentdatatable $ComputersTable -HideFooter
 $rpt += Get-HTMLContentClose
+
+
+$rpt += Get-HTMLContentOpen -HeaderText "Computers Charts"
+$rpt += Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 2
+$rpt += Get-HTMLPieChart -ChartObject $PieObjectComputersProtected -DataSet $ComputerProtectedTable
+$rpt += Get-HTMLColumnClose
+$rpt += Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 2
+$rpt += Get-HTMLPieChart -ChartObject $PieObjectComputersEnabled -DataSet $ComputersEnabledTable
+$rpt += Get-HTMLColumnClose
+$rpt += Get-HTMLContentclose
+
 $rpt += get-htmltabcontentclose
 
 $rpt += Get-HTMLClosePage
