@@ -35,6 +35,15 @@ $DaysUntilPWExpireINT = 7
 $ADNumber = 3
 
 ########################################
+#Check for ReportHTML Module
+$Mod = get-module -ListAvailable -Name "ReportHTML"
+If ($null -eq $Mod)
+{
+	Write-Host "ReportHTML Module is not present, attempting to install it"
+	Install-Module -Name ReportHTML -Force
+	Import-Module ReportHTML -ErrorAction SilentlyContinue
+}
+
 #Array of default Security Groups
 $DefaultSGs = @(
 		"Access Control Assistance Operators"
@@ -115,6 +124,7 @@ $GroupProtectionTable 				= New-Object 'System.Collections.Generic.List[System.O
 $OUProtectionTable 					= New-Object 'System.Collections.Generic.List[System.Object]'
 $GPOTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $ADObjectTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$ProtectedUsersTable = New-Object 'System.Collections.Generic.List[System.Object]'
 
 # Get all users right away. Instead of doing several lookups, we will use this object to look up all the information needed.
 $AllUsers = Get-ADUser -Filter * -Properties *
@@ -596,6 +606,8 @@ $UserEnabled 				= 0
 $UserDisabled 				= 0
 $UserPasswordExpires 		= 0
 $UserPasswordNeverExpires 	= 0
+$ProtectedUsers 			= 0
+$NonProtectedUsers          = 0
 
 Foreach ($User in $AllUsers)
 {
@@ -654,6 +666,16 @@ Foreach ($User in $AllUsers)
 		$userphaventloggedonrecentlytable = [PSCustomObject]@{
 			'Information' = "Information: No Users were found to have not logged on in $Days days"
 		}
+	}
+	
+	#Items for protected vs non protected users
+	If ($User.ProtectedFromAccidentalDeletion -eq $False)
+	{
+		$NonProtectedUsers++
+	}
+	Else
+	{
+		$ProtectedUsers++
 	}
 	
 	#Items for the enabled vs disabled users pie chart
@@ -761,6 +783,24 @@ $objULic = [PSCustomObject]@{
 
 $PasswordExpirationTable.add($objULic)
 
+
+#Data for protected users pie graph
+$objULic = [PSCustomObject]@{
+	'Name'  = 'Protected'
+	'Count' = $ProtectedUsers
+}
+
+$ProtectedUsersTable.add($objULic)
+
+
+$objULic = [PSCustomObject]@{
+	'Name'  = 'Not Protected'
+	'Count' = $NonProtectedUsers
+}
+
+$ProtectedUsersTable.add($objULic)
+
+
 <###########################
 	   Group Policy
 ############################>
@@ -802,6 +842,25 @@ $PO12.ChartStyle.ColorSchemeName = 'Random'
 #Name and Count are the default to work with the Group function.
 $PO12.DataDefinition.DataNameColumnName = 'Name'
 $PO12.DataDefinition.DataValueColumnName = 'Count'
+
+
+##--USERS Protection PIE CHART--##
+#basic Properties 
+$PieObjectProtectedUsers = Get-HTMLPieChartObject
+$PieObjectProtectedUsers.Title = "Users Protected from Deletion"
+$PieObjectProtectedUsers.Size.Height = 250
+$PieObjectProtectedUsers.Size.width = 250
+$PieObjectProtectedUsers.ChartStyle.ChartType = 'doughnut'
+#These file exist in the module directoy, There are 4 schemes by default
+$PieObjectProtectedUsers.ChartStyle.ColorSchemeName = "ColorScheme3"
+#There are 8 generated schemes, randomly generated at runtime 
+$PieObjectProtectedUsers.ChartStyle.ColorSchemeName = "Generated3"
+#you can also ask for a random scheme.  Which also happens if you have too many records for the scheme
+$PieObjectProtectedUsers.ChartStyle.ColorSchemeName = 'Random'
+#Data defintion you can reference any column from name and value from the  dataset.  
+#Name and Count are the default to work with the Group function.
+$PieObjectProtectedUsers.DataDefinition.DataNameColumnName = 'Name'
+$PieObjectProtectedUsers.DataDefinition.DataValueColumnName = 'Count'
 
 #basic Properties 
 $PieObjectOUGPOLinks = Get-HTMLPieChartObject
@@ -1098,12 +1157,15 @@ $rpt += Get-HtmlContentClose
 
 
 	$rpt += Get-HTMLContentOpen -HeaderText "Users Charts"
-		$rpt += Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 2
+		$rpt += Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 3
 		$rpt += Get-HTMLPieChart -ChartObject $EnabledDisabledUsersPieObject -DataSet $EnabledDisabledUsersTable
 	$rpt += Get-HTMLColumnClose
-	$rpt += Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 2
+	$rpt += Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 3
 		$rpt += Get-HTMLPieChart -ChartObject $PWExpiresUsersTable -DataSet $PasswordExpirationTable
 	$rpt += Get-HTMLColumnClose
+$rpt += Get-HTMLColumnOpen -ColumnNumber 3 -ColumnCount 3
+$rpt += Get-HTMLPieChart -ChartObject $PieObjectProtectedUsers -DataSet $ProtectedUsersTable
+$rpt += Get-HTMLColumnClose
 
 	$rpt += Get-HTMLContentClose
 $rpt += get-htmltabcontentclose
