@@ -31,6 +31,8 @@ $UserCreatedDays = 7
 #Get users whos passwords expire in less than X amount of days
 $DaysUntilPWExpireINT = 7
 
+#Get AD Objects that have been modified in X days and newer
+$ADNumber = 3
 
 ########################################
 #Array of default Security Groups
@@ -111,14 +113,43 @@ $EnterpriseAdminTable 				= New-Object 'System.Collections.Generic.List[System.O
 $NewCreatedUsersTable 				= New-Object 'System.Collections.Generic.List[System.Object]'
 $GroupProtectionTable 				= New-Object 'System.Collections.Generic.List[System.Object]'
 $OUProtectionTable 					= New-Object 'System.Collections.Generic.List[System.Object]'
+$GPOTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$ADObjectTable = New-Object 'System.Collections.Generic.List[System.Object]'
 
 # Get all users right away. Instead of doing several lookups, we will use this object to look up all the information needed.
 $AllUsers = Get-ADUser -Filter * -Properties *
-$GPOs = Get-GPO -all
+$GPOs = Get-GPO -all | Select-Object DisplayName, GPOStatus, ModificationTime, @{ Label = "ComputerVersion"; Expression = { $_.computer.dsversion } }, @{ Label = "UserVersion"; Expression = { $_.user.dsversion } }
+
 
 <###########################
          Dashboard
 ############################>
+
+
+$dte = (Get-Date).AddDays(- $ADNumber)
+$ADObjs = Get-ADObject -Filter 'whenchanged -gt $dte' -Properties *
+foreach ($ADObj in $ADObjs)
+{
+	If ($ADObj.ObjectClass -eq "GroupPolicyContainer")
+	{
+		$Name = $ADObj.DisplayName
+	}
+	Else
+	{
+		$Name = $ADObj.Name
+	}
+	$obj = [PSCustomObject]@{
+		'Name'	      = $Name
+		'Object Type' = $ADObj.ObjectClass
+		'When Changed' = $ADObj.WhenChanged
+		
+	}
+	
+	$ADObjectTable.add($obj)
+	
+}
+
+
 
 $ADRecycleBinStatus = (Get-ADOptionalFeature -Filter 'name -like "Recycle Bin Feature"').EnabledScopes
 If ($ADRecycleBinStatus.Count -lt 1)
@@ -730,6 +761,27 @@ $objULic = [PSCustomObject]@{
 
 $PasswordExpirationTable.add($objULic)
 
+<###########################
+	   Group Policy
+############################>
+$GPOTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$GPOs = Get-GPO -all | Select-Object DisplayName, GPOStatus, ModificationTime, @{ Label = "ComputerVersion"; Expression = { $_.computer.dsversion } }, @{ Label = "UserVersion"; Expression = { $_.user.dsversion } }
+foreach ($GPO in $GPOs)
+{
+	
+	
+	$obj = [PSCustomObject]@{
+		'Name' = $GPO.DisplayName
+		'Status' = $GPO.GpoStatus
+		'Modified Date' = $GPO.ModificationTime
+		'User Version' = $GPO.UserVersion
+		'Computer Version' = $GPO.ComputerVersion
+	}
+	
+	$GPOTable.add($obj)
+}
+
+
 
 $tabarray = @('Dashboard', 'Groups', 'Organizational Units', 'Users', 'Group Policy')
 
@@ -916,8 +968,11 @@ $rpt += Get-HtmlContentOpen -HeaderText 'Enterprise Administrators'
 $rpt += get-htmlcontentdatatable $EnterpriseAdminTable -HideFooter
 $rpt += Get-HtmlContentClose
 $rpt += get-htmlColumnClose
-
 $rpt += Get-HtmlContentClose
+
+$rpt += Get-HTMLContentOpen -HeaderText "AD Objects Modified in Last $ADNumber Days"
+$rpt += Get-HtmlContentTable $ADObjectTable
+$rpt += Get-HTMLContentClose
 
 $rpt += Get-HtmlContentOpen -HeaderText "Accounts"
 $rpt += get-HtmlColumn1of2
@@ -1052,6 +1107,12 @@ $rpt += Get-HtmlContentClose
 
 	$rpt += Get-HTMLContentClose
 $rpt += get-htmltabcontentclose
+
+
+$rpt += get-htmltabcontentopen -TabName $tabarray[4] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
+$rpt += Get-HTMLContentOpen -HeaderText "Group Policies"
+$rpt += get-htmlcontentdatatable $GPOTable -HideFooter
+$rpt += Get-HTMLContentClose
 
 $rpt += Get-HTMLClosePage
 
