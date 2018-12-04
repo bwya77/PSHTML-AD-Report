@@ -81,7 +81,6 @@ $DefaultSGs = @(
 		"Network Configuration Operators"
 		"Performance Log Users"
 		"Performance Monitor Users"
-		"Pre–Windows 2000 Compatible Access"
 		"Print Operators"
 		"Protected Users"
 		"RAS and IAS Servers"
