@@ -134,6 +134,10 @@ $ComputerProtectedTable = New-Object 'System.Collections.Generic.List[System.Obj
 $ComputersEnabledTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $DefaultComputersinDefaultOUTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $DefaultUsersinDefaultOUTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$TOPUserTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$TOPGroupsTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$TOPComputersTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$GraphComputerOS = New-Object 'System.Collections.Generic.List[System.Object]'
 
 # Get all users right away. Instead of doing several lookups, we will use this object to look up all the information needed.
 $AllUsers = Get-ADUser -Filter * -Properties *
@@ -474,6 +478,15 @@ If (($table).count -eq 0)
 	}
 }
 
+#TOP groups table
+$obj1 = [PSCustomObject]@{
+	'Total Groups'  = $Groups.count
+	'Mail-Enabled Security Groups' = $MailSecurityCount
+	'Security Groups' = $SecurityCount
+	'Distribution Groups' = $DistroCount
+}
+$TOPGroupsTable.add($obj1)
+
 $obj1 = [PSCustomObject]@{
 	'Name'  = 'Mail-Enabled Security Groups'
 	'Count' = $MailSecurityCount
@@ -651,6 +664,10 @@ $UserPasswordNeverExpires 	= 0
 $ProtectedUsers 			= 0
 $NonProtectedUsers          = 0
 
+$UsersWIthPasswordsExpiringInUnderAWeek = 0
+$UsersNotLoggedInOver30Days = 0
+$AccountsExpiringSoon = 0
+
 Foreach ($User in $AllUsers)
 {
 	
@@ -755,8 +772,6 @@ Foreach ($User in $AllUsers)
 	$PasswordNeverExpires 	= $AttVar.PasswordNeverExpires
 	$daysUntilPWExpire 		= $daystoexpire
 
-	#lastpasswordchange
-	#reset password on expiration
 	
 	
 	
@@ -843,6 +858,17 @@ $objULic = [PSCustomObject]@{
 $ProtectedUsersTable.add($objULic)
 
 
+#TOP User table
+$objULic = [PSCustomObject]@{
+	'Total Users'  = $AllUsers.count
+	"Users with Passwords Expiring in less than $DaysUntilPWExpireINT days" = $PasswordExpireSoonTable.count
+	'Expiring Accounts' = $ExpiringAccountsTable.count
+	"Users Haven't Logged on in $Days Days" = $userphaventloggedonrecentlytable.count
+}
+
+$TOPUserTable.add($objULic)
+
+
 <###########################
 	   Group Policy
 ############################>
@@ -872,6 +898,17 @@ $ComputersProtected = 0
 $ComputersNotProtected = 0
 $ComputerEnabled = 0
 $ComputerDisabled = 0
+
+$Server2016 = 0
+$Server2012 = 0
+$Server2012R2 = 0
+$Server2008R2 = 0
+$Windows10 = 0
+$Windows8 = 0
+$Windows7 = 0
+$Server2012R2 = 0
+
+
 foreach ($Computer in $Computers)
 {
 	
@@ -905,6 +942,36 @@ foreach ($Computer in $Computers)
 	
 	$ComputersTable.add($obj)
 	
+	
+	If ($Computer.OperatingSystem -like "*Server 2016*")
+	{
+		$Server2016++
+	}
+	ElseIf ($Computer.OperatingSystem -like "*Server 2012 R2*")
+	{
+		$Server2012R2++
+	}
+	ElseIf ($Computer.OperatingSystem -like "*Server 2012*")
+	{
+		$Server2012++
+	}
+	ElseIf ($Computer.OperatingSystem -like "*Server 2008 R2*")
+	{
+		$Server2008R2++
+	}
+	ElseIf ($Computer.OperatingSystem -like "*Windows 10*")
+	{
+		$Windows10++
+	}
+	ElseIf ($Computer.OperatingSystem -like "*Windows 8*")
+	{
+		$Windows8++
+	}
+	Elseif ($Computer.OperatingSystem -like "*Windows 7*")
+	{
+		$Windows7++
+	}
+	
 }
 If (($ComputersTable).count -eq 0)
 {
@@ -912,6 +979,63 @@ If (($ComputersTable).count -eq 0)
 		'Information' = 'Information: No Computers were found'
 	}
 }
+
+#Data for TOP Computers data table
+$objULic = [PSCustomObject]@{
+	'Total Computers'  = $Computers.count
+	"Server 2016"	  = $Server2016
+	"Server 2012 R2"  = $Server2012R2
+	"Server 2012"  = $Server2012
+	"Server 2008 R2"  = $Server2008R2
+	"Windows 10"	  = $Windows10
+	"Windows 8"	      = $Windows8
+	"Windows 7" = $Windows7
+}
+$TOPComputersTable.add($objULic)
+
+#Pie chart breaking down OS for computer obj
+$objULic = [PSCustomObject]@{
+	'Name' = "Server 2016"
+	"Count"	  = $Server2016
+}
+$GraphComputerOS.add($objULic)
+
+$objULic = [PSCustomObject]@{
+	'Name'  = "Server 2012 R2"
+	"Count" = $Server2012R2
+}
+$GraphComputerOS.add($objULic)
+
+$objULic = [PSCustomObject]@{
+	'Name'  = "Server 2012"
+	"Count" = $Server2012
+}
+$GraphComputerOS.add($objULic)
+
+$objULic = [PSCustomObject]@{
+	'Name'  = "Server 2008 R2"
+	"Count" = $Server2008R2
+}
+$GraphComputerOS.add($objULic)
+
+$objULic = [PSCustomObject]@{
+	'Name'  = "Windows 10"
+	"Count" = $Windows10
+}
+$GraphComputerOS.add($objULic)
+
+$objULic = [PSCustomObject]@{
+	'Name'  = "Windows 8"
+	"Count" = $Windows8
+}
+$GraphComputerOS.add($objULic)
+
+$objULic = [PSCustomObject]@{
+	'Name'  = "Windows 7"
+	"Count" = $Windows7
+}
+$GraphComputerOS.add($objULic)
+################################
 
 #Data for protected Computers pie graph
 $objULic = [PSCustomObject]@{
@@ -967,6 +1091,17 @@ $PO12.ChartStyle.ColorSchemeName = 'Random'
 #Name and Count are the default to work with the Group function.
 $PO12.DataDefinition.DataNameColumnName = 'Name'
 $PO12.DataDefinition.DataValueColumnName = 'Count'
+
+##--Computer OS Breakdown PIE CHART--##
+$PieObjectComputerObjOS = Get-HTMLPieChartObject
+$PieObjectComputerObjOS.Title = "Computer Operating Systems"
+#These file exist in the module directoy, There are 4 schemes by default
+$PieObjectComputerObjOS.ChartStyle.ColorSchemeName = "ColorScheme3"
+#There are 8 generated schemes, randomly generated at runtime 
+$PieObjectComputerObjOS.ChartStyle.ColorSchemeName = "Generated3"
+#you can also ask for a random scheme.  Which also happens if you have too many records for the scheme
+$PieObjectComputerObjOS.ChartStyle.ColorSchemeName = 'Random'
+
 
 ##--Computers Protection PIE CHART--##
 #basic Properties 
@@ -1168,11 +1303,6 @@ $rpt = New-Object 'System.Collections.Generic.List[System.Object]'
 $rpt += get-htmlopenpage -TitleText $ReportTitle -LeftLogoString $CompanyLogo -RightLogoString $RightLogo -CSSName $CssName
 $rpt += Get-HTMLTabHeader -TabNames $tabarray
 
-
-
-
-
-
 	$rpt += get-htmltabcontentopen -TabName $tabarray[0] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
 			$rpt += Get-HTMLContentOpen -HeaderText "Company Information"
 				$rpt += Get-HtmlContentTable $CompanyInfoTable
@@ -1253,6 +1383,11 @@ $rpt += get-htmltabcontentclose
 
 #Groups Report
 $rpt += get-htmltabcontentopen -TabName $tabarray[1] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
+
+$rpt += Get-HTMLContentOpen -HeaderText "Groups Overivew"
+$rpt += Get-HtmlContentTable $TOPGroupsTable -HideFooter
+$rpt += Get-HTMLContentClose
+
 	$rpt += Get-HTMLContentOpen -HeaderText "Active Directory Groups"
 		$rpt += get-htmlcontentdatatable $Table -HideFooter
 	$rpt += Get-HTMLContentClose
@@ -1307,6 +1442,11 @@ $rpt += get-htmltabcontentclose
 
 #Users Report
 $rpt += get-htmltabcontentopen -TabName $tabarray[3] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
+
+$rpt += Get-HTMLContentOpen -HeaderText "Users Overivew"
+$rpt += Get-HtmlContentTable $TOPUserTable -HideFooter
+$rpt += Get-HTMLContentClose
+
 	$rpt += Get-HTMLContentOpen -HeaderText "Active Directory Users"
 		$rpt += get-htmlcontentdatatable $UserTable -HideFooter
 	$rpt += Get-HTMLContentClose
@@ -1367,6 +1507,11 @@ $rpt += get-htmltabcontentclose
 
 #Computers Report
 $rpt += get-htmltabcontentopen -TabName $tabarray[5] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
+
+$rpt += Get-HTMLContentOpen -HeaderText "Computers Overivew"
+$rpt += Get-HtmlContentTable $TOPComputersTable -HideFooter
+$rpt += Get-HTMLContentClose
+
 $rpt += Get-HTMLContentOpen -HeaderText "Computers"
 $rpt += get-htmlcontentdatatable $ComputersTable -HideFooter
 $rpt += Get-HTMLContentClose
@@ -1379,6 +1524,10 @@ $rpt += Get-HTMLColumnClose
 $rpt += Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 2
 $rpt += Get-HTMLPieChart -ChartObject $PieObjectComputersEnabled -DataSet $ComputersEnabledTable
 $rpt += Get-HTMLColumnClose
+$rpt += Get-HTMLContentclose
+
+$rpt += Get-HTMLContentOpen -HeaderText "Computers Operating System Breakdown"
+$rpt += Get-HTMLPieChart -ChartObject $PieObjectComputerObjOS -DataSet $GraphComputerOS
 $rpt += Get-HTMLContentclose
 
 $rpt += get-htmltabcontentclose
