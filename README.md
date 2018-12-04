@@ -10,7 +10,7 @@ Requires ReportHTML module but will attempt to install on first run. Requires Ac
 
 While I walk you through the report, you can view it for yourself [here](https://thelazyadministrator.com/wp-content/uploads/2018/12/4-12-2018-ADReport.html)
 
-(Blog Link)[https://thelazyadministrator.com/2018/12/02/get-an-active-directory-interactive-html-report-with-powershell]
+[Blog Link](https://thelazyadministrator.com/2018/12/02/get-an-active-directory-interactive-html-report-with-powershell)
 ____
 
 # Dashboard
