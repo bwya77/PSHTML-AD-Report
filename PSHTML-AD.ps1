@@ -36,7 +36,7 @@ $ADNumber = 3
 
 #CSS templatee located C:\Program Files\WindowsPowerShell\Modules\ReportHTML\1.4.1.1\
 #Default template is orange and named "Sample"
-$CssName = "psm"
+
 
 ########################################
 #Check for ReportHTML Module
@@ -1300,7 +1300,7 @@ $PieObjectGroupProtection.DataDefinition.DataValueColumnName = 'Count'
 
 
 $rpt = New-Object 'System.Collections.Generic.List[System.Object]'
-$rpt += get-htmlopenpage -TitleText $ReportTitle -LeftLogoString $CompanyLogo -RightLogoString $RightLogo -CSSName $CssName
+$rpt += get-htmlopenpage -TitleText $ReportTitle -LeftLogoString $CompanyLogo -RightLogoString $RightLogo 
 $rpt += Get-HTMLTabHeader -TabNames $tabarray
 
 	$rpt += get-htmltabcontentopen -TabName $tabarray[0] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
