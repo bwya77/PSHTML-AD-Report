@@ -616,7 +616,7 @@ Foreach ($OU in $OUs)
 If (($OUTable).count -eq 0)
 {
 	$OUTable = [PSCustomObject]@{
-		'Information' = 'Information: No Licenses were found in the tenant'
+		'Information' = 'Information: No Organizational Units were found'
 	}
 }
 
@@ -1441,7 +1441,7 @@ $rpt += Get-HTMLContentclose
 $rpt += get-htmltabcontentclose
 
 #Users Report
-$rpt += get-htmltabcontentopen -TabName $tabarray[3] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
+$rpt += get-htmltabcontentopen -TabName $tabarray[3] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy)) 
 
 $rpt += Get-HTMLContentOpen -HeaderText "Users Overivew"
 $rpt += Get-HtmlContentTable $TOPUserTable -HideFooter
