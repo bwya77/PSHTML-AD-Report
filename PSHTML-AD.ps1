@@ -216,8 +216,27 @@ $TOPGroupsTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $TOPComputersTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $GraphComputerOS = New-Object 'System.Collections.Generic.List[System.Object]'
 
-#Get all users right away. Instead of doing several lookups, we will use this object to look up all the information needed.
-$AllUsers = Get-ADUser -Filter * -Properties *
+#Retrieve all known Domain Controllers
+$DCs = (Get-ADDomainController -Filter *).Name
+
+#Loop through all Domain Controllers for user data; ensures most recent LastLogon attribute value is used for accuracy
+$AllDCUsers = foreach($DC in $DCs) {
+
+    #Get all AD User Data from each Domain Controller
+    Get-ADUser -Server $DC -Filter * -Properties * | Sort Name
+}
+
+$AllUsers = $(
+
+    #Select unique accountnames; all user data will be in multiples of the number of Domain Controllers you have
+    $Unique = ($AllDCUsers | Select SamAccountName -Unique | Sort SamAccountName).SamAccountName
+
+    foreach($U in $Unique) {
+
+        #Selects most recent LastLogon time User Object from all Domain Controllers AD User Data; LastLogon does NOT replicate across Domain Controllers
+        ($AllDCUsers | Where { $_.SamAccountName -Match $U } | Sort LastLogon -Descending)[0]
+    }
+)
 
 $GPOs = Get-GPO -All | Select-Object DisplayName, GPOStatus, ModificationTime, @{ Label = "ComputerVersion"; Expression = { $_.computer.dsversion } }, @{ Label = "UserVersion"; Expression = { $_.user.dsversion } }
 
