@@ -1,8 +1,8 @@
 function LastLogonConvert ($ftDate)
 {
     $date = [DateTime]::FromFileTime($ftDate)
-    if ($date -lt (Get-Date '1/1/1900') -or $date -eq 0 -or $date -eq $null) { "Never" }
-    else { $date }
+    If ($date -lt (Get-Date '1/1/1900') -or $date -eq 0 -or $date -eq $Null) { "Never" }
+    Else { $date }
 } # End function LastLogonConvert
 
 #########################################
@@ -40,8 +40,8 @@ $ADNumber = 3
 
 ########################################
 # Check for ReportHTML Module
-$Mod = get-module -ListAvailable -Name "ReportHTML"
-If ($null -eq $Mod)
+$Mod = Get-Module -ListAvailable -Name "ReportHTML"
+If ($Null -eq $Mod)
 {
     Write-Host "ReportHTML Module is not present, attempting to install it"
     Install-Module -Name ReportHTML -Force
@@ -149,7 +149,7 @@ $GPOs       = Get-GPO -all | Select-Object DisplayName, GPOStatus, ModificationT
 
 $dte    = (Get-Date).AddDays(- $ADNumber)
 $ADObjs = Get-ADObject -Filter { whenchanged -gt $dte -and ObjectClass -ne "domainDNS" -and ObjectClass -ne "rIDManager" -and ObjectClass -ne "rIDSet" } -Properties *
-foreach ($ADObj in $ADObjs)
+ForEach ($ADObj in $ADObjs)
 {
     If ($ADObj.ObjectClass -eq "GroupPolicyContainer")
     {
@@ -210,7 +210,7 @@ $CompanyInfoTable.add($obj)
 # Get newly created users
 $When = ((Get-Date).AddDays(-$UserCreatedDays)).Date
 $NewUsers = Get-ADUser -Filter { whenCreated -ge $When } -Properties whenCreated
-foreach ($Newuser in $Newusers)
+ForEach ($Newuser in $Newusers)
 {
     $obj = [PSCustomObject]@{
         'Name'          = $Newuser.Name
@@ -225,11 +225,11 @@ foreach ($Newuser in $Newusers)
 # Get Domain Admins
 $DomainAdminMembers = Get-ADGroupMember "Domain Admins"
 
-Foreach ($DomainAdminMember in $DomainAdminMembers)
+ForEach ($DomainAdminMember in $DomainAdminMembers)
 {
     $Name       = $DomainAdminMember.Name
     $Type       = $DomainAdminMember.ObjectClass
-    $Enabled    = (Get-ADUser -filter * | Where-Object { $_.Name -eq $Name }).Enabled
+    $Enabled    = (Get-ADUser -Filter * | Where-Object { $_.Name -eq $Name }).Enabled
 
     $obj = [PSCustomObject]@{
         'Name'      = $Name
@@ -245,11 +245,11 @@ Foreach ($DomainAdminMember in $DomainAdminMembers)
 # Get Enterprise Admins
 $EnterpriseAdminsMembers = Get-ADGroupMember "Enterprise Admins"
 
-Foreach ($EnterpriseAdminsMember in $EnterpriseAdminsMembers)
+ForEach ($EnterpriseAdminsMember in $EnterpriseAdminsMembers)
 {
     $Name       = $EnterpriseAdminsMember.Name
     $Type       = $EnterpriseAdminsMember.ObjectClass
-    $Enabled    = (Get-ADUser -filter * | Where-Object { $_.Name -eq $Name }).Enabled
+    $Enabled    = (Get-ADUser -Filter * | Where-Object { $_.Name -eq $Name }).Enabled
 
     $obj = [PSCustomObject]@{
         'Name'    = $Name
@@ -263,7 +263,7 @@ Foreach ($EnterpriseAdminsMember in $EnterpriseAdminsMembers)
 
 $DefaultComputersOU = (Get-ADDomain).computerscontainer
 $DefaultComputers   = Get-ADComputer -Filter * -Properties * -SearchBase "$DefaultComputersOU"
-foreach ($DefaultComputer in $DefaultComputers)
+ForEach ($DefaultComputer in $DefaultComputers)
 {
     $obj = [PSCustomObject]@{
         'Name'                  = $DefaultComputer.Name
@@ -281,7 +281,7 @@ foreach ($DefaultComputer in $DefaultComputers)
 
 $DefaultUsersOU = (Get-ADDomain).userscontainer
 $DefaultUsers   = Get-ADUser -Filter * -Properties * -SearchBase "$DefaultUsersOU" | Select-Object Name, UserPrincipalName, Enabled, ProtectedFromAccidentalDeletion, EmailAddress, @{ Name = 'lastlogon'; Expression = { LastLogonConvert $_.lastlogon } }, DistinguishedName
-foreach ($DefaultUser in $DefaultUsers)
+ForEach ($DefaultUser in $DefaultUsers)
 {
     $obj = [PSCustomObject]@{
         'Name'                    = $DefaultUser.Name
@@ -299,7 +299,7 @@ foreach ($DefaultUser in $DefaultUsers)
 
 # Expiring Accounts
 $LooseUsers = Search-ADAccount -AccountExpiring -UsersOnly
-Foreach ($LooseUser in $LooseUsers)
+ForEach ($LooseUser in $LooseUsers)
 {
     $NameLoose      = $LooseUser.Name
     $UPNLoose       = $LooseUser.UserPrincipalName
@@ -327,7 +327,7 @@ If (($ExpiringAccountsTable).count -eq 0)
 
 # Security Logs
 $SecurityLogs = Get-EventLog -Newest 7 -LogName "Security" | Where-Object { $_.Message -like "*An account*" }
-Foreach ($SecurityLog in $SecurityLogs)
+ForEach ($SecurityLog in $SecurityLogs)
 {
     $TimeGenerated = $SecurityLog.TimeGenerated
     $EntryType     = $SecurityLog.EntryType
@@ -369,7 +369,7 @@ $Domains = Get-ADForest | Select-Object -ExpandProperty upnsuffixes | ForEach-Ob
 
 
 # Get groups and sort in alphabetical order
-$Groups = Get-ADGroup -Filter * -properties *
+$Groups = Get-ADGroup -Filter * -Properties *
 
 $SecurityCount          = 0
 $MailSecurityCount      = 0
@@ -381,11 +381,11 @@ $GroupsProtected        = 0
 $GroupsNotProtected     = 0
 
 
-Foreach ($Group in $Groups)
+ForEach ($Group in $Groups)
 {
     $DefaultADGroup = 'False'
     $Type           = New-Object 'System.Collections.Generic.List[System.Object]'
-    $Gemail         = (Get-ADGroup $Group -properties mail).mail
+    $Gemail         = (Get-ADGroup $Group -Properties mail).mail
 
     If (($group.GroupCategory -eq "Security") -and ($Gemail -ne $Null))
     {
@@ -419,11 +419,11 @@ Foreach ($Group in $Groups)
 
 
 
-    if ($group.GroupCategory -eq "Distribution")
+    If ($group.GroupCategory -eq "Distribution")
     {
         $Type = "Distribution Group"
     }
-    if (($group.GroupCategory -eq "Security") -and (($Gemail) -eq $Null))
+    If (($group.GroupCategory -eq "Security") -and (($Gemail) -eq $Null))
     {
         $Type = "Security Group"
     }
@@ -561,14 +561,14 @@ $GroupMembershipTable.add($objmem)
 ############################>
 
 # Get all OU's'
-$OUs = Get-ADOrganizationalUnit -filter * -properties *
+$OUs = Get-ADOrganizationalUnit -Filter * -Properties *
 
 $OUwithLinked   = 0
 $OUwithnoLink   = 0
 $OUProtected    = 0
 $OUNotProtected = 0
 
-Foreach ($OU in $OUs)
+ForEach ($OU in $OUs)
 {
     $LinkedGPOs = New-Object 'System.Collections.Generic.List[System.Object]'
     If (($OU.linkedgrouppolicyobjects).length -lt 1)
@@ -580,7 +580,7 @@ Foreach ($OU in $OUs)
     {
         $OUwithLinked++
         $GPOs = $OU.linkedgrouppolicyobjects
-        foreach ($GPO in $GPOs)
+        ForEach ($GPO in $GPOs)
         {
             $Split1 = $GPO -split "{" | Select-Object -Last 1
             $Split2 = $Split1 -split "}" | Select-Object -First 1
@@ -665,18 +665,18 @@ $UsersWIthPasswordsExpiringInUnderAWeek = 0
 $UsersNotLoggedInOver30Days             = 0
 $AccountsExpiringSoon                   = 0
 
-Foreach ($User in $AllUsers)
+ForEach ($User in $AllUsers)
 {
 
-    $AttVar = get-aduser -filter {name -eq $User.Name} -Properties * | Select-Object Enabled,PasswordExpired, PasswordLastSet, PasswordNeverExpires, PasswordNotRequired, Name, SamAccountName, EmailAddress, AccountExpirationDate, @{ Name = 'lastlogon'; Expression = { LastLogonConvert $_.lastlogon } }, DistinguishedName
+    $AttVar = Get-ADUser -Filter {Name -eq $User.Name} -Properties * | Select-Object Enabled,PasswordExpired, PasswordLastSet, PasswordNeverExpires, PasswordNotRequired, Name, SamAccountName, EmailAddress, AccountExpirationDate, @{ Name = 'lastlogon'; Expression = { LastLogonConvert $_.lastlogon } }, DistinguishedName
 
     $maxPasswordAge = (Get-ADDefaultDomainPasswordPolicy).MaxPasswordAge
 
-    If ((($AttVar.PasswordNeverExpires) -eq $False) -and (($AttVar.Enabled) -ne $false))
+    If ((($AttVar.PasswordNeverExpires) -eq $False) -and (($AttVar.Enabled) -ne $False))
     {
         # Get Password last set date
-        $passwordSetDate = (Get-ADUser $user -properties * | ForEach-Object { $_.PasswordLastSet })
-        If ($null -eq $passwordSetDate)
+        $passwordSetDate = (Get-ADUser $user -Properties * | ForEach-Object { $_.PasswordLastSet })
+        If ($Null -eq $passwordSetDate)
         {
             $daystoexpire = "User has never logged on"
         }
@@ -684,13 +684,13 @@ Foreach ($User in $AllUsers)
         {
             # Check for Fine Grained Passwords
             $PasswordPol = (Get-ADUserResultantPasswordPolicy $user)
-            if (($PasswordPol) -ne $null)
+            If (($PasswordPol) -ne $Null)
             {
                 $maxPasswordAge = ($PasswordPol).MaxPasswordAge
             }
 
             $expireson = $passwordsetdate + $maxPasswordAge
-            $today     = (get-date)
+            $today     = (Get-Date)
             # Gets the count on how many days until the password expires and stores it in the $daystoexpire var
             $daystoexpire = (New-TimeSpan -Start $today -End $Expireson).Days
 
@@ -735,7 +735,7 @@ Foreach ($User in $AllUsers)
     }
 
     # Items for the enabled vs disabled users pie chart
-    If (($AttVar.PasswordNeverExpires) -ne $false)
+    If (($AttVar.PasswordNeverExpires) -ne $False)
     {
         $UserPasswordNeverExpires++
     }
@@ -745,7 +745,7 @@ Foreach ($User in $AllUsers)
     }
 
     # Items for password expiration pie chart
-    If (($AttVar.Enabled) -ne $false)
+    If (($AttVar.Enabled) -ne $False)
     {
         $UserEnabled++
     }
@@ -871,7 +871,7 @@ $TOPUserTable.add($objULic)
 ############################>
 $GPOTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $GPOs = Get-GPO -all | Select-Object DisplayName, GPOStatus, ModificationTime, @{ Label = "ComputerVersion"; Expression = { $_.computer.dsversion } }, @{ Label = "UserVersion"; Expression = { $_.user.dsversion } }
-foreach ($GPO in $GPOs)
+ForEach ($GPO in $GPOs)
 {
 
     $obj = [PSCustomObject]@{
@@ -889,7 +889,7 @@ foreach ($GPO in $GPOs)
 <###########################
          Computers
 ############################>
-$Computers             = Get-ADComputer -filter * -properties *
+$Computers             = Get-ADComputer -Filter * -Properties *
 $ComputersProtected    = 0
 $ComputersNotProtected = 0
 $ComputerEnabled       = 0
@@ -905,7 +905,7 @@ $Windows7     = 0
 $Server2012R2 = 0
 
 
-foreach ($Computer in $Computers)
+ForEach ($Computer in $Computers)
 {
 
     If ($Computer.ProtectedFromAccidentalDeletion -eq $True)
@@ -1297,107 +1297,105 @@ $PieObjectGroupProtection.DataDefinition.DataValueColumnName = 'Count'
 
 
 $rpt = New-Object 'System.Collections.Generic.List[System.Object]'
-$rpt += get-htmlopenpage -TitleText $ReportTitle -LeftLogoString $CompanyLogo -RightLogoString $RightLogo
+$rpt += Get-HTMLOpenPage -TitleText $ReportTitle -LeftLogoString $CompanyLogo -RightLogoString $RightLogo
 $rpt += Get-HTMLTabHeader -TabNames $tabarray
 
-$rpt += get-htmltabcontentopen -TabName $tabarray[0] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
+$rpt += Get-HTMLTabContentOpen -TabName $tabarray[0] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
 $rpt += Get-HTMLContentOpen -HeaderText "Company Information"
-$rpt += Get-HtmlContentTable $CompanyInfoTable
+$rpt += Get-HTMLContentTable $CompanyInfoTable
 $rpt += Get-HTMLContentClose
 
-$rpt += Get-HtmlContentOpen -HeaderText "Groups"
-$rpt += get-HtmlColumn1of2
-$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText 'Domain Administrators'
-$rpt += get-htmlcontentdatatable $DomainAdminTable -HideFooter
-$rpt += Get-HtmlContentClose
-$rpt += get-htmlColumnClose
-$rpt += get-htmlColumn2of2
-$rpt += Get-HtmlContentOpen -HeaderText 'Enterprise Administrators'
-$rpt += get-htmlcontentdatatable $EnterpriseAdminTable -HideFooter
-$rpt += Get-HtmlContentClose
-$rpt += get-htmlColumnClose
-$rpt += Get-HtmlContentClose
+$rpt += Get-HTMLContentOpen -HeaderText "Groups"
+$rpt += Get-HTMLColumn1of2
+$rpt += Get-HTMLContentOpen -BackgroundShade 1 -HeaderText 'Domain Administrators'
+$rpt += Get-HTMLContentDataTable $DomainAdminTable -HideFooter
+$rpt += Get-HTMLContentClose
+$rpt += Get-HTMLColumnClose
+$rpt += Get-HTMLColumn2of2
+$rpt += Get-HTMLContentOpen -HeaderText 'Enterprise Administrators'
+$rpt += Get-HTMLContentDataTable $EnterpriseAdminTable -HideFooter
+$rpt += Get-HTMLContentClose
+$rpt += Get-HTMLColumnClose
+$rpt += Get-HTMLContentClose
 
-$rpt += Get-HtmlContentOpen -HeaderText "Objects in Default OUs"
-$rpt += get-HtmlColumn1of2
-$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText 'Computers'
-$rpt += get-htmlcontentdatatable $DefaultComputersinDefaultOUTable -HideFooter
-$rpt += Get-HtmlContentClose
-$rpt += get-htmlColumnClose
-$rpt += get-htmlColumn2of2
-$rpt += Get-HtmlContentOpen -HeaderText 'Users'
-$rpt += get-htmlcontentdatatable $DefaultUsersinDefaultOUTable -HideFooter
-$rpt += Get-HtmlContentClose
-$rpt += get-htmlColumnClose
-$rpt += Get-HtmlContentClose
+$rpt += Get-HTMLContentOpen -HeaderText "Objects in Default OUs"
+$rpt += Get-HTMLColumn1of2
+$rpt += Get-HTMLContentOpen -BackgroundShade 1 -HeaderText 'Computers'
+$rpt += Get-HTMLContentDataTable $DefaultComputersinDefaultOUTable -HideFooter
+$rpt += Get-HTMLContentClose
+$rpt += Get-HTMLColumnClose
+$rpt += Get-HTMLColumn2of2
+$rpt += Get-HTMLContentOpen -HeaderText 'Users'
+$rpt += Get-HTMLContentDataTable $DefaultUsersinDefaultOUTable -HideFooter
+$rpt += Get-HTMLContentClose
+$rpt += Get-HTMLColumnClose
+$rpt += Get-HTMLContentClose
 
 $rpt += Get-HTMLContentOpen -HeaderText "AD Objects Modified in Last $ADNumber Days"
-$rpt += get-htmlcontentdatatable $ADObjectTable
+$rpt += Get-HTMLContentDataTable $ADObjectTable
 $rpt += Get-HTMLContentClose
 
-$rpt += Get-HtmlContentOpen -HeaderText "Expiring Items"
+$rpt += Get-HTMLContentOpen -HeaderText "Expiring Items"
 
-$rpt += get-HtmlColumn1of2
-$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Users with Passwords Expiring in less than $DaysUntilPWExpireINT days"
-$rpt += get-htmlcontentdatatable $PasswordExpireSoonTable -HideFooter
-$rpt += Get-HtmlContentClose
-$rpt += get-htmlColumnClose
+$rpt += Get-HTMLColumn1of2
+$rpt += Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users with Passwords Expiring in less than $DaysUntilPWExpireINT days"
+$rpt += Get-HTMLContentDataTable $PasswordExpireSoonTable -HideFooter
+$rpt += Get-HTMLContentClose
+$rpt += Get-HTMLColumnClose
 
-$rpt += get-htmlColumn2of2
-$rpt += Get-HtmlContentOpen -HeaderText 'Accounts Expiring Soon'
-$rpt += get-htmlcontentdatatable $ExpiringAccountsTable -HideFooter
-$rpt += Get-HtmlContentClose
-$rpt += get-htmlColumnClose
+$rpt += Get-HTMLColumn2of2
+$rpt += Get-HTMLContentOpen -HeaderText 'Accounts Expiring Soon'
+$rpt += Get-HTMLContentDataTable $ExpiringAccountsTable -HideFooter
+$rpt += Get-HTMLContentClose
+$rpt += Get-HTMLColumnClose
 
-$rpt += Get-HtmlContentClose
-
-
-$rpt += Get-HtmlContentOpen -HeaderText "Accounts"
-
-$rpt += get-HtmlColumn1of2
-$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days"
-$rpt += get-htmlcontentdatatable $userphaventloggedonrecentlytable -HideFooter
-$rpt += Get-HtmlContentClose
-$rpt += get-htmlColumnClose
-$rpt += get-htmlColumn2of2
-$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Accounts Created in $UserCreatedDays Days or Less"
-$rpt += get-htmlcontentdatatable $NewCreatedUsersTable -HideFooter
-$rpt += Get-HtmlContentClose
-$rpt += get-htmlColumnClose
-
-$rpt += Get-HtmlContentClose
+$rpt += Get-HTMLContentClose
 
 
-            $rpt += Get-HTMLContentOpen -HeaderText "Security Logs"
-                $rpt += Get-HTMLContentDataTable $securityeventtable -HideFooter
-            $rpt += Get-HTMLContentClose
+$rpt += Get-HTMLContentOpen -HeaderText "Accounts"
 
-        $rpt += Get-HTMLContentOpen -HeaderText "UPN Suffixes"
-            $rpt += Get-HtmlContentTable $DomainTable
-        $rpt += Get-HTMLContentClose
-$rpt += get-htmltabcontentclose
+$rpt += Get-HTMLColumn1of2
+$rpt += Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days"
+$rpt += Get-HTMLContentDataTable $userphaventloggedonrecentlytable -HideFooter
+$rpt += Get-HTMLContentClose
+$rpt += Get-HTMLColumnClose
+$rpt += Get-HTMLColumn2of2
+$rpt += Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Accounts Created in $UserCreatedDays Days or Less"
+$rpt += Get-HTMLContentDataTable $NewCreatedUsersTable -HideFooter
+$rpt += Get-HTMLContentClose
+$rpt += Get-HTMLColumnClose
+$rpt += Get-HTMLContentClose
+
+$rpt += Get-HTMLContentOpen -HeaderText "Security Logs"
+$rpt += Get-HTMLContentDataTable $securityeventtable -HideFooter
+$rpt += Get-HTMLContentClose
+
+$rpt += Get-HTMLContentOpen -HeaderText "UPN Suffixes"
+$rpt += Get-HTMLContentTable $DomainTable
+$rpt += Get-HTMLContentClose
+$rpt += Get-HTMLTabContentClose
 
 # Groups Report
-$rpt += get-htmltabcontentopen -TabName $tabarray[1] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
+$rpt += Get-HTMLTabContentOpen -TabName $tabarray[1] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
 
 $rpt += Get-HTMLContentOpen -HeaderText "Groups Overivew"
-$rpt += Get-HtmlContentTable $TOPGroupsTable -HideFooter
+$rpt += Get-HTMLContentTable $TOPGroupsTable -HideFooter
 $rpt += Get-HTMLContentClose
 
     $rpt += Get-HTMLContentOpen -HeaderText "Active Directory Groups"
-        $rpt += get-htmlcontentdatatable $Table -HideFooter
+        $rpt += Get-HTMLContentDataTable $Table -HideFooter
     $rpt += Get-HTMLContentClose
 
-    $rpt += get-HtmlColumn1of2
-        $rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText 'Domain Administrators'
-            $rpt += get-htmlcontentdatatable $DomainAdminTable -HideFooter
-        $rpt += Get-HtmlContentClose
-    $rpt += get-htmlColumnClose
-    $rpt += get-htmlColumn2of2
-        $rpt += Get-HtmlContentOpen -HeaderText 'Enterprise Administrators'
-            $rpt += get-htmlcontentdatatable $EnterpriseAdminTable -HideFooter
-        $rpt += Get-HtmlContentClose
-    $rpt += get-htmlColumnClose
+    $rpt += Get-HTMLColumn1of2
+        $rpt += Get-HTMLContentOpen -BackgroundShade 1 -HeaderText 'Domain Administrators'
+            $rpt += Get-HTMLContentDataTable $DomainAdminTable -HideFooter
+        $rpt += Get-HTMLContentClose
+    $rpt += Get-HTMLColumnClose
+    $rpt += Get-HTMLColumn2of2
+        $rpt += Get-HTMLContentOpen -HeaderText 'Enterprise Administrators'
+            $rpt += Get-HTMLContentDataTable $EnterpriseAdminTable -HideFooter
+        $rpt += Get-HTMLContentClose
+    $rpt += Get-HTMLColumnClose
 
 
     $rpt += Get-HTMLContentOpen -HeaderText "Active Directory Groups Chart"
@@ -1414,12 +1412,12 @@ $rpt += Get-HTMLColumnOpen -ColumnNumber 4 -ColumnCount 4
 $rpt += Get-HTMLPieChart -ChartObject $PieObjectGroupProtection -DataSet $GroupProtectionTable
 $rpt += Get-HTMLColumnClose
     $rpt += Get-HTMLContentClose
-$rpt += get-htmltabcontentclose
+$rpt += Get-HTMLTabContentClose
 
 # Organizational Unit Report
-$rpt += get-htmltabcontentopen -TabName $tabarray[2] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
+$rpt += Get-HTMLTabContentOpen -TabName $tabarray[2] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
     $rpt += Get-HTMLContentOpen -HeaderText "Organizational Units"
-$rpt += get-htmlcontentdatatable $OUTable -HideFooter
+$rpt += Get-HTMLContentDataTable $OUTable -HideFooter
 $rpt += Get-HTMLContentClose
 
 
@@ -1432,86 +1430,81 @@ $rpt += Get-HTMLPieChart -ChartObject $PO12 -DataSet $OUProtectionTable
 $rpt += Get-HTMLColumnClose
 $rpt += Get-HTMLContentclose
 
-
-
-$rpt += get-htmltabcontentclose
+$rpt += Get-HTMLTabContentClose
 
 # Users Report
-$rpt += get-htmltabcontentopen -TabName $tabarray[3] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
+$rpt += Get-HTMLTabContentOpen -TabName $tabarray[3] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
 
 $rpt += Get-HTMLContentOpen -HeaderText "Users Overivew"
-$rpt += Get-HtmlContentTable $TOPUserTable -HideFooter
+$rpt += Get-HTMLContentTable $TOPUserTable -HideFooter
 $rpt += Get-HTMLContentClose
 
-    $rpt += Get-HTMLContentOpen -HeaderText "Active Directory Users"
-        $rpt += get-htmlcontentdatatable $UserTable -HideFooter
-    $rpt += Get-HTMLContentClose
+$rpt += Get-HTMLContentOpen -HeaderText "Active Directory Users"
+$rpt += Get-HTMLContentDataTable $UserTable -HideFooter
+$rpt += Get-HTMLContentClose
 
-$rpt += Get-HtmlContentOpen -HeaderText "Expiring Items"
-$rpt += get-HtmlColumn1of2
-$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Users with Passwords Expiring in less than $DaysUntilPWExpireINT days"
-$rpt += get-htmlcontentdatatable $PasswordExpireSoonTable -HideFooter
-$rpt += Get-HtmlContentClose
-$rpt += get-htmlColumnClose
-$rpt += get-htmlColumn2of2
-$rpt += Get-HtmlContentOpen -HeaderText 'Accounts Expiring Soon'
-$rpt += get-htmlcontentdatatable $ExpiringAccountsTable -HideFooter
-$rpt += Get-HtmlContentClose
-$rpt += get-htmlColumnClose
+$rpt += Get-HTMLContentOpen -HeaderText "Expiring Items"
+$rpt += Get-HTMLColumn1of2
+$rpt += Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users with Passwords Expiring in less than $DaysUntilPWExpireINT days"
+$rpt += Get-HTMLContentDataTable $PasswordExpireSoonTable -HideFooter
+$rpt += Get-HTMLContentClose
+$rpt += Get-HTMLColumnClose
+$rpt += Get-HTMLColumn2of2
+$rpt += Get-HTMLContentOpen -HeaderText 'Accounts Expiring Soon'
+$rpt += Get-HTMLContentDataTable $ExpiringAccountsTable -HideFooter
+$rpt += Get-HTMLContentClose
+$rpt += Get-HTMLColumnClose
 
-$rpt += Get-HtmlContentClose
-
-
-
-$rpt += Get-HtmlContentOpen -HeaderText "Accounts"
-$rpt += get-HtmlColumn1of2
-$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days"
-$rpt += get-htmlcontentdatatable $userphaventloggedonrecentlytable -HideFooter
-$rpt += Get-HtmlContentClose
-$rpt += get-htmlColumnClose
-$rpt += get-htmlColumn2of2
-$rpt += Get-HtmlContentOpen -BackgroundShade 1 -HeaderText "Accounts Created in $UserCreatedDays Days or Less"
-$rpt += get-htmlcontentdatatable $NewCreatedUsersTable -HideFooter
-$rpt += Get-HtmlContentClose
-$rpt += get-htmlColumnClose
-
-$rpt += Get-HtmlContentClose
+$rpt += Get-HTMLContentClose
 
 
 
+$rpt += Get-HTMLContentOpen -HeaderText "Accounts"
+$rpt += Get-HTMLColumn1of2
+$rpt += Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days"
+$rpt += Get-HTMLContentDataTable $userphaventloggedonrecentlytable -HideFooter
+$rpt += Get-HTMLContentClose
+$rpt += Get-HTMLColumnClose
+$rpt += Get-HTMLColumn2of2
+$rpt += Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Accounts Created in $UserCreatedDays Days or Less"
+$rpt += Get-HTMLContentDataTable $NewCreatedUsersTable -HideFooter
+$rpt += Get-HTMLContentClose
+$rpt += Get-HTMLColumnClose
 
-    $rpt += Get-HTMLContentOpen -HeaderText "Users Charts"
-        $rpt += Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 3
-        $rpt += Get-HTMLPieChart -ChartObject $EnabledDisabledUsersPieObject -DataSet $EnabledDisabledUsersTable
-    $rpt += Get-HTMLColumnClose
-    $rpt += Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 3
-        $rpt += Get-HTMLPieChart -ChartObject $PWExpiresUsersTable -DataSet $PasswordExpirationTable
-    $rpt += Get-HTMLColumnClose
+$rpt += Get-HTMLContentClose
+
+$rpt += Get-HTMLContentOpen -HeaderText "Users Charts"
+$rpt += Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 3
+$rpt += Get-HTMLPieChart -ChartObject $EnabledDisabledUsersPieObject -DataSet $EnabledDisabledUsersTable
+$rpt += Get-HTMLColumnClose
+$rpt += Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 3
+$rpt += Get-HTMLPieChart -ChartObject $PWExpiresUsersTable -DataSet $PasswordExpirationTable
+$rpt += Get-HTMLColumnClose
 $rpt += Get-HTMLColumnOpen -ColumnNumber 3 -ColumnCount 3
 $rpt += Get-HTMLPieChart -ChartObject $PieObjectProtectedUsers -DataSet $ProtectedUsersTable
 $rpt += Get-HTMLColumnClose
 
-    $rpt += Get-HTMLContentClose
-$rpt += get-htmltabcontentclose
+$rpt += Get-HTMLContentClose
+
+$rpt += Get-HTMLTabContentClose
 
 # GPO Report
-$rpt += get-htmltabcontentopen -TabName $tabarray[4] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
+$rpt += Get-HTMLTabContentOpen -TabName $tabarray[4] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
 $rpt += Get-HTMLContentOpen -HeaderText "Group Policies"
-$rpt += get-htmlcontentdatatable $GPOTable -HideFooter
+$rpt += Get-HTMLContentDataTable $GPOTable -HideFooter
 $rpt += Get-HTMLContentClose
-$rpt += get-htmltabcontentclose
+$rpt += Get-HTMLTabContentClose
 
 # Computers Report
-$rpt += get-htmltabcontentopen -TabName $tabarray[5] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
+$rpt += Get-HTMLTabContentOpen -TabName $tabarray[5] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))
 
 $rpt += Get-HTMLContentOpen -HeaderText "Computers Overivew"
-$rpt += Get-HtmlContentTable $TOPComputersTable -HideFooter
+$rpt += Get-HTMLContentTable $TOPComputersTable -HideFooter
 $rpt += Get-HTMLContentClose
 
 $rpt += Get-HTMLContentOpen -HeaderText "Computers"
-$rpt += get-htmlcontentdatatable $ComputersTable -HideFooter
+$rpt += Get-HTMLContentDataTable $ComputersTable -HideFooter
 $rpt += Get-HTMLContentClose
-
 
 $rpt += Get-HTMLContentOpen -HeaderText "Computers Charts"
 $rpt += Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 2
@@ -1526,7 +1519,7 @@ $rpt += Get-HTMLContentOpen -HeaderText "Computers Operating System Breakdown"
 $rpt += Get-HTMLPieChart -ChartObject $PieObjectComputerObjOS -DataSet $GraphComputerOS
 $rpt += Get-HTMLContentclose
 
-$rpt += get-htmltabcontentclose
+$rpt += Get-HTMLTabContentClose
 
 $rpt += Get-HTMLClosePage
 
