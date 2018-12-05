@@ -52,32 +52,32 @@ param (
 	#Company logo that will be displayed on the left, can be URL or UNC
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter URL or UNC path to Company Logo")]
 	[String]$CompanyLogo = "",
-	#Logo that will be on the right side, UNC or URL
 
+	#Logo that will be on the right side, UNC or URL
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter URL or UNC path for Side Logo")]
 	[String]$RightLogo = "https://www.psmpartners.com/wp-content/uploads/2017/10/porcaro-stolarek-mete.png",
-	#Title of generated report
 
+	#Title of generated report
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired title for report")]
 	[String]$ReportTitle = "Active Directory Report",
-	#Location the report will be saved to
 
+	#Location the report will be saved to
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired directory path to save; Default: C:\Automation\")]
 	[String]$ReportSavePath = "C:\Automation\",
-	#Find users that have not logged in X Amount of days, this sets the days
 
+	#Find users that have not logged in X Amount of days, this sets the days
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have not logged in within [X] amount of days; Default: 1")]
 	$Days = 1,
-	#Get users who have been created in X amount of days and less
 
+	#Get users who have been created in X amount of days and less
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have been created within [X] amount of days; Default: 7")]
 	$UserCreatedDays = 7,
-	#Get users whos passwords expire in less than X amount of days
 
+	#Get users whos passwords expire in less than X amount of days
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users password expires within [X] amount of days; Default: 7")]
 	$DaysUntilPWExpireINT = 7,
-	#Get AD Objects that have been modified in X days and newer
 
+	#Get AD Objects that have been modified in X days and newer
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "AD Objects that have been modified within [X] amount of days; Default: 3")]
 	$ADModNumber = 3
 	
