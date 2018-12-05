@@ -570,7 +570,16 @@ foreach ($Group in $Groups)
 	}
 	
 	$OwnerDN = Get-ADGroup -Filter { name -eq $Group.Name } -Properties managedBy | Select-Object -ExpandProperty ManagedBy
-	$Manager = $AllUsers | Where-Object { $_.distinguishedname -eq $OwnerDN } | Select-Object -ExpandProperty Name
+	Try
+	{
+		$Manager = Get-ADUser -Filter { distinguishedname -like $OwnerDN } | Select-Object -ExpandProperty Name
+	}
+	Catch
+	{
+		write-host -ForegroundColor Yellow "Cannot resolve the manager, " $Manager " on the group " $group.name
+	}
+	
+	#$Manager = $AllUsers | Where-Object { $_.distinguishedname -eq $OwnerDN } | Select-Object -ExpandProperty Name
 	
 	$obj = [PSCustomObject]@{
 		
@@ -692,7 +701,7 @@ Write-Host "Done!" -ForegroundColor White
 
 Write-Host "Working on Organizational Units Report..." -ForegroundColor Green
 
-#Get all OU's'
+#Get all OUs'
 $OUs = Get-ADOrganizationalUnit -Filter * -Properties *
 $OUwithLinked = 0
 $OUwithnoLink = 0
@@ -762,7 +771,7 @@ if (($OUTable).Count -eq 0)
 #OUs with no GPO Linked
 $obj1 = [PSCustomObject]@{
 	
-	'Name'  = "OU's with no GPO's linked"
+	'Name'  = "OUs with no GPO's linked"
 	'Count' = $OUwithnoLink
 }
 
@@ -770,7 +779,7 @@ $OUGPOTable.Add($obj1)
 
 $obj2 = [PSCustomObject]@{
 	
-	'Name'  = "OU's with GPO's linked"
+	'Name'  = "OUs with GPO's linked"
 	'Count' = $OUwithLinked
 }
 
