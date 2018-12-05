@@ -311,6 +311,16 @@ foreach ($Newuser in $Newusers)
 	$NewCreatedUsersTable.Add($obj)
 }
 
+
+if (($NewCreatedUsersTable).Count -eq 0)
+{
+	
+	$NewCreatedUsersTable = [PSCustomObject]@{
+		
+		Information = 'Information: No New Users Have Been Created Recently'
+	}
+}
+
 #Get Domain Admins
 $DomainAdminMembers = Get-ADGroupMember "Domain Admins"
 
