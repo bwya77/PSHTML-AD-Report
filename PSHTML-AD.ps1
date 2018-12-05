@@ -561,7 +561,7 @@ $GroupMembershipTable.add($objmem)
     Organizational Units
 ############################>
 
-#Get all OU's'
+#Get all OUs'
 $OUs = Get-ADOrganizationalUnit -filter * -properties * 
 
 $OUwithLinked = 0
@@ -622,14 +622,14 @@ If (($OUTable).count -eq 0)
 
 #OUs with no GPO Linked
 $obj1 = [PSCustomObject]@{
-	'Name'  = "OU's with no GPO's linked"
+	'Name'  = "OUs with no GPOs linked"
 	'Count' = $OUwithnoLink
 }
 
 $OUGPOTable.add($obj1)
 
 $obj2 = [PSCustomObject]@{
-	'Name'  = "OU's with GPO's linked"
+	'Name'  = "OUs with GPOs linked"
 	'Count' = $OUwithLinked
 }
 
