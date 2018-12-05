@@ -399,6 +399,15 @@ foreach ($DefaultUser in $DefaultUsers)
 	$DefaultUsersinDefaultOUTable.Add($obj)
 }
 
+if (($DefaultUsersinDefaultOUTable).Count -eq 0)
+{
+	
+	$DefaultUsersinDefaultOUTable = [PSCustomObject]@{
+		
+		Information = 'Information: No Computers were found in the Default OU'
+	}
+}
+
 #Expiring Accounts
 $LooseUsers = Search-ADAccount -AccountExpiring -UsersOnly
 
