@@ -41,79 +41,96 @@
     -ADModNumber "3"
 
 .NOTES
-    Author: <Insert your name>
-    Date: <Insert your creation date>
+    Author: Bradley Wyatt
+    Date: 12/4/2018
     Modified: JBear 12/5/2018
+			  Bradley Wyatt 12/5/2018
 #>
 
-param(
+param (
+	
+	#Company logo that will be displayed on the left, can be URL or UNC
+	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter URL or UNC path to Company Logo")]
+	[String]$CompanyLogo = "",
+	#Logo that will be on the right side, UNC or URL
 
-    #Company logo that will be displayed on the left, can be URL or UNC
-    [Parameter(ValueFromPipeline=$true,HelpMessage="Enter URL or UNC path to Company Logo")]
-    [String]$CompanyLogo = "",
+	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter URL or UNC path for Side Logo")]
+	[String]$RightLogo = "https://www.psmpartners.com/wp-content/uploads/2017/10/porcaro-stolarek-mete.png",
+	#Title of generated report
 
-    #Logo that will be on the right side, UNC or URL
-    [Parameter(ValueFromPipeline=$true,HelpMessage="Enter URL or UNC path for Side Logo")]
-    [String]$RightLogo = "https://www.psmpartners.com/wp-content/uploads/2017/10/porcaro-stolarek-mete.png",
+	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired title for report")]
+	[String]$ReportTitle = "Active Directory Report",
+	#Location the report will be saved to
 
-    #Title of generated report
-    [Parameter(ValueFromPipeline=$true,HelpMessage="Enter desired title for report")]
-    [String]$ReportTitle = "Active Directory Report",
+	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired directory path to save; Default: C:\Automation\")]
+	[String]$ReportSavePath = "C:\Automation\",
+	#Find users that have not logged in X Amount of days, this sets the days
 
-    #Location the report will be saved to
-    [Parameter(ValueFromPipeline=$true,HelpMessage="Enter desired directory path to save; Default: C:\Automation\")]
-    [String]$ReportSavePath = "C:\Automation\",
+	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have not logged in within [X] amount of days; Default: 1")]
+	$Days = 1,
+	#Get users who have been created in X amount of days and less
 
-    #Find users that have not logged in X Amount of days, this sets the days
-    [Parameter(ValueFromPipeline=$true,HelpMessage="Users that have not logged in within [X] amount of days; Default: 1")]
-    $Days = 1,
+	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have been created within [X] amount of days; Default: 7")]
+	$UserCreatedDays = 7,
+	#Get users whos passwords expire in less than X amount of days
 
-    #Get users who have been created in X amount of days and less
-    [Parameter(ValueFromPipeline=$true,HelpMessage="Users that have been created within [X] amount of days; Default: 7")]
-    $UserCreatedDays = 7,
+	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users password expires within [X] amount of days; Default: 7")]
+	$DaysUntilPWExpireINT = 7,
+	#Get AD Objects that have been modified in X days and newer
 
-    #Get users whos passwords expire in less than X amount of days
-    [Parameter(ValueFromPipeline=$true,HelpMessage="Users password expires within [X] amount of days; Default: 7")]
-    $DaysUntilPWExpireINT = 7,
-
-    #Get AD Objects that have been modified in X days and newer
-    [Parameter(ValueFromPipeline=$true,HelpMessage="AD Objects that have been modified within [X] amount of days; Default: 3")]
-    $ADModNumber = 3
-
-    #CSS template located C:\Program Files\WindowsPowerShell\Modules\ReportHTML\1.4.1.1\
-    #Default template is orange and named "Sample"
+	[Parameter(ValueFromPipeline = $true, HelpMessage = "AD Objects that have been modified within [X] amount of days; Default: 3")]
+	$ADModNumber = 3
+	
+	#CSS template located C:\Program Files\WindowsPowerShell\Modules\ReportHTML\1.4.1.1\
+	#Default template is orange and named "Sample"
 )
 
-function LastLogonConvert ($ftDate) {
+Write-Host "Gathering Report Customization..." -ForegroundColor White
+Write-Host "__________________________________" -ForegroundColor White
+(Write-Host -NoNewline "Company Logo (left): " -ForegroundColor Yellow),(Write-Host  $CompanyLogo -ForegroundColor White)
+(Write-Host -NoNewline "Company Logo (right): " -ForegroundColor Yellow),(Write-Host  $RightLogo -ForegroundColor White)
+(Write-Host -NoNewline "Report Title: " -ForegroundColor Yellow),(Write-Host  $ReportTitle -ForegroundColor White)
+(Write-Host -NoNewline "Report Save Path: " -ForegroundColor Yellow),(Write-Host  $ReportSavePath -ForegroundColor White)
+(Write-Host -NoNewline "Amount of Days from Last User Logon Report: " -ForegroundColor Yellow),(Write-Host  $Days -ForegroundColor White)
+(Write-Host -NoNewline "Amount of Days for New User Creation Report: " -ForegroundColor Yellow),(Write-Host  $UserCreatedDays -ForegroundColor White)
+(Write-Host -NoNewline "Amount of Days for User Password Expiration Report: " -ForegroundColor Yellow),(Write-Host  $DaysUntilPWExpireINT -ForegroundColor White)
+(Write-Host -NoNewline "Amount of Days for Newly Modified AD Objects Report: " -ForegroundColor Yellow), (Write-Host  $ADModNumber -ForegroundColor White)
+Write-Host "__________________________________" -ForegroundColor White
 
+function LastLogonConvert ($ftDate)
+{
+	
 	$Date = [DateTime]::FromFileTime($ftDate)
-
-	if($Date -lt (Get-Date '1/1/1900') -or $date -eq 0 -or $date -eq $null) { 
-
-        "Never" 
-    }
-
-	else { 
-
-        $Date 
-    }
-
-}#End function LastLogonConvert
+	
+	if ($Date -lt (Get-Date '1/1/1900') -or $date -eq 0 -or $date -eq $null)
+	{
+		
+		"Never"
+	}
+	
+	else
+	{
+		
+		$Date
+	}
+	
+} #End function LastLogonConvert
 
 #Check for ReportHTML Module
 $Mod = Get-Module -ListAvailable -Name "ReportHTML"
 
-If($null -eq $Mod) {
-
+If ($null -eq $Mod)
+{
+	
 	Write-Host "ReportHTML Module is not present, attempting to install it"
-
+	
 	Install-Module -Name ReportHTML -Force
 	Import-Module ReportHTML -ErrorAction SilentlyContinue
 }
 
 #Array of default Security Groups
 $DefaultSGs = @(
-
+	
 	"Access Control Assistance Operators"
 	"Account Operators"
 	"Administrators"
@@ -146,6 +163,7 @@ $DefaultSGs = @(
 	"Performance Log Users"
 	"Performance Monitor Users"
 	"Print Operators"
+	"Pre-Windows 2000 Compatible Access"
 	"Protected Users"
 	"RAS and IAS Servers"
 	"RDS Endpoint Servers"
@@ -165,171 +183,182 @@ $DefaultSGs = @(
 	"WinRMRemoteWMIUsers"
 )
 
-$Table 								= New-Object 'System.Collections.Generic.List[System.Object]'
-$OUTable 							= New-Object 'System.Collections.Generic.List[System.Object]'
-$UserTable 							= New-Object 'System.Collections.Generic.List[System.Object]'
-$GroupTypetable		    			= New-Object 'System.Collections.Generic.List[System.Object]'
-$DefaultGrouptable 					= New-Object 'System.Collections.Generic.List[System.Object]'
-$EnabledDisabledUsersTable 			= New-Object 'System.Collections.Generic.List[System.Object]'
-$DomainAdminTable 					= New-Object 'System.Collections.Generic.List[System.Object]'
-$ExpiringAccountsTable 				= New-Object 'System.Collections.Generic.List[System.Object]'
-$CompanyInfoTable 					= New-Object 'System.Collections.Generic.List[System.Object]'
-$securityeventtable 				= New-Object 'System.Collections.Generic.List[System.Object]'
-$DomainTable 						= New-Object 'System.Collections.Generic.List[System.Object]'
-$OUGPOTable 						= New-Object 'System.Collections.Generic.List[System.Object]'
-$GroupMembershipTable 				= New-Object 'System.Collections.Generic.List[System.Object]'
-$PasswordExpirationTable 			= New-Object 'System.Collections.Generic.List[System.Object]'
-$PasswordExpireSoonTable 			= New-Object 'System.Collections.Generic.List[System.Object]'
-$userphaventloggedonrecentlytable 	= New-Object 'System.Collections.Generic.List[System.Object]'
-$EnterpriseAdminTable 				= New-Object 'System.Collections.Generic.List[System.Object]'
-$NewCreatedUsersTable 				= New-Object 'System.Collections.Generic.List[System.Object]'
-$GroupProtectionTable 				= New-Object 'System.Collections.Generic.List[System.Object]'
-$OUProtectionTable 					= New-Object 'System.Collections.Generic.List[System.Object]'
-$GPOTable                           = New-Object 'System.Collections.Generic.List[System.Object]'
-$ADObjectTable                      = New-Object 'System.Collections.Generic.List[System.Object]'
-$ProtectedUsersTable                = New-Object 'System.Collections.Generic.List[System.Object]'
-$ComputersTable                     = New-Object 'System.Collections.Generic.List[System.Object]'
-$ComputerProtectedTable             = New-Object 'System.Collections.Generic.List[System.Object]'
-$ComputersEnabledTable              = New-Object 'System.Collections.Generic.List[System.Object]'
-$DefaultComputersinDefaultOUTable   = New-Object 'System.Collections.Generic.List[System.Object]'
-$DefaultUsersinDefaultOUTable       = New-Object 'System.Collections.Generic.List[System.Object]'
-$TOPUserTable                       = New-Object 'System.Collections.Generic.List[System.Object]'
-$TOPGroupsTable                     = New-Object 'System.Collections.Generic.List[System.Object]'
-$TOPComputersTable                  = New-Object 'System.Collections.Generic.List[System.Object]'
-$GraphComputerOS                    = New-Object 'System.Collections.Generic.List[System.Object]'
+$Table = New-Object 'System.Collections.Generic.List[System.Object]'
+$OUTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$UserTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$GroupTypetable = New-Object 'System.Collections.Generic.List[System.Object]'
+$DefaultGrouptable = New-Object 'System.Collections.Generic.List[System.Object]'
+$EnabledDisabledUsersTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$DomainAdminTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$ExpiringAccountsTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$CompanyInfoTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$securityeventtable = New-Object 'System.Collections.Generic.List[System.Object]'
+$DomainTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$OUGPOTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$GroupMembershipTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$PasswordExpirationTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$PasswordExpireSoonTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$userphaventloggedonrecentlytable = New-Object 'System.Collections.Generic.List[System.Object]'
+$EnterpriseAdminTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$NewCreatedUsersTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$GroupProtectionTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$OUProtectionTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$GPOTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$ADObjectTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$ProtectedUsersTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$ComputersTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$ComputerProtectedTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$ComputersEnabledTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$DefaultComputersinDefaultOUTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$DefaultUsersinDefaultOUTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$TOPUserTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$TOPGroupsTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$TOPComputersTable = New-Object 'System.Collections.Generic.List[System.Object]'
+$GraphComputerOS = New-Object 'System.Collections.Generic.List[System.Object]'
 
 #Get all users right away. Instead of doing several lookups, we will use this object to look up all the information needed.
 $AllUsers = Get-ADUser -Filter * -Properties *
 
-$GPOs = Get-GPO -aAl | Select-Object DisplayName, GPOStatus, ModificationTime, @{ Label = "ComputerVersion"; Expression = { $_.computer.dsversion } }, @{ Label = "UserVersion"; Expression = { $_.user.dsversion } }
+$GPOs = Get-GPO -All | Select-Object DisplayName, GPOStatus, ModificationTime, @{ Label = "ComputerVersion"; Expression = { $_.computer.dsversion } }, @{ Label = "UserVersion"; Expression = { $_.user.dsversion } }
 
 <###########################
          Dashboard
 ############################>
 
+Write-Host "Working on Dashboard Report..." -ForegroundColor Green
+
 $dte = (Get-Date).AddDays(- $ADModNumber)
 
 $ADObjs = Get-ADObject -Filter { whenchanged -gt $dte -and ObjectClass -ne "domainDNS" -and ObjectClass -ne "rIDManager" -and ObjectClass -ne "rIDSet" } -Properties *
 
-foreach($ADObj in $ADObjs) {
-
-	if($ADObj.ObjectClass -eq "GroupPolicyContainer") {
-
+foreach ($ADObj in $ADObjs)
+{
+	
+	if ($ADObj.ObjectClass -eq "GroupPolicyContainer")
+	{
+		
 		$Name = $ADObj.DisplayName
 	}
-
-	else {
-
+	
+	else
+	{
+		
 		$Name = $ADObj.Name
 	}
-
+	
 	$obj = [PSCustomObject]@{
-
+		
 		'Name'	      = $Name
 		'Object Type' = $ADObj.ObjectClass
 		'When Changed' = $ADObj.WhenChanged
 	}
-
+	
 	$ADObjectTable.Add($obj)
 }
 
 $ADRecycleBinStatus = (Get-ADOptionalFeature -Filter 'name -like "Recycle Bin Feature"').EnabledScopes
 
-if($ADRecycleBinStatus.Count -lt 1) {
-
+if ($ADRecycleBinStatus.Count -lt 1)
+{
+	
 	$ADRecycleBin = "Disabled"
 }
 
-else {
-
+else
+{
+	
 	$ADRecycleBin = "Enabled"
 }
 
 #Company Information
-$ADInfo 				= Get-ADDomain
-$ForestObj 				= Get-ADForest
-$DomainControllerobj    = Get-ADDomain    
-$Forest 				= $ADInfo.Forest
-$InfrastructureMaster   = $DomainControllerobj.InfrastructureMaster
-$RIDMaster 				= $DomainControllerobj.RIDMaster
-$PDCEmulator 			= $DomainControllerobj.PDCEmulator
-$DomainNamingMaster 	= $ForestObj.DomainNamingMaster
-$SchemaMaster 			= $ForestObj.SchemaMaster
+$ADInfo = Get-ADDomain
+$ForestObj = Get-ADForest
+$DomainControllerobj = Get-ADDomain
+$Forest = $ADInfo.Forest
+$InfrastructureMaster = $DomainControllerobj.InfrastructureMaster
+$RIDMaster = $DomainControllerobj.RIDMaster
+$PDCEmulator = $DomainControllerobj.PDCEmulator
+$DomainNamingMaster = $ForestObj.DomainNamingMaster
+$SchemaMaster = $ForestObj.SchemaMaster
 
 $obj = [PSCustomObject]@{
-
+	
 	'Domain'			    = $Forest
-	'AD Recycle Bin'		= $ADRecycleBin
+	'AD Recycle Bin'	    = $ADRecycleBin
 	'Infrastructure Master' = $InfrastructureMaster
-	'RID Master'	  		= $RIDMaster
+	'RID Master'		    = $RIDMaster
 	'PDC Emulator'		    = $PDCEmulator
 	'Domain Naming Master'  = $DomainNamingMaster
-	'Schema Master'			= $SchemaMaster
+	'Schema Master'		    = $SchemaMaster
 }
 
 $CompanyInfoTable.Add($obj)
 
 #Get newly created users
-$When = ((Get-Date).AddDays(-$UserCreatedDays)).Date
-$NewUsers = $AllUsers | Where { $_.whenCreated -ge $When }
+$When = ((Get-Date).AddDays(- $UserCreatedDays)).Date
+$NewUsers = $AllUsers | Where-Object { $_.whenCreated -ge $When }
 
-foreach($Newuser in $Newusers) {
-
+foreach ($Newuser in $Newusers)
+{
+	
 	$obj = [PSCustomObject]@{
-
-		'Name'			    = $Newuser.Name
-		'Enabled' 			= $Newuser.Enabled
-		'Creation Date'		= $Newuser.whenCreated
+		
+		'Name' = $Newuser.Name
+		'Enabled' = $Newuser.Enabled
+		'Creation Date' = $Newuser.whenCreated
 	}
-
-	$NewCreatedUsersTable.Add($obj)	
+	
+	$NewCreatedUsersTable.Add($obj)
 }
 
 #Get Domain Admins
 $DomainAdminMembers = Get-ADGroupMember "Domain Admins"
 
-foreach($DomainAdminMember in $DomainAdminMembers) {
-
-	$Name 		= $DomainAdminMember.Name
-	$Type 		= $DomainAdminMember.ObjectClass
-	$Enabled 	= ($AllUsers | where { $_.Name -eq $Name }).Enabled
-
+foreach ($DomainAdminMember in $DomainAdminMembers)
+{
+	
+	$Name = $DomainAdminMember.Name
+	$Type = $DomainAdminMember.ObjectClass
+	$Enabled = ($AllUsers | Where-Object { $_.Name -eq $Name }).Enabled
+	
 	$obj = [PSCustomObject]@{
-
-		'Name'		     = $Name
-		'Enabled'    	 = $Enabled
-		'Type' 		     = $Type
+		
+		'Name'    = $Name
+		'Enabled' = $Enabled
+		'Type'    = $Type
 	}
-
+	
 	$DomainAdminTable.Add($obj)
 }
 
 #Get Enterprise Admins
 $EnterpriseAdminsMembers = Get-ADGroupMember "Enterprise Admins"
 
-foreach($EnterpriseAdminsMember in $EnterpriseAdminsMembers) {
-
-	$Name 		= $EnterpriseAdminsMember.Name
-	$Type 		= $EnterpriseAdminsMember.ObjectClass
-	$Enabled 	= ($AllUsers | where { $_.Name -eq $Name }).Enabled
-
+foreach ($EnterpriseAdminsMember in $EnterpriseAdminsMembers)
+{
+	
+	$Name = $EnterpriseAdminsMember.Name
+	$Type = $EnterpriseAdminsMember.ObjectClass
+	$Enabled = ($AllUsers | Where-Object { $_.Name -eq $Name }).Enabled
+	
 	$obj = [PSCustomObject]@{
-
+		
 		'Name'    = $Name
 		'Enabled' = $Enabled
 		'Type'    = $Type
 	}
-
+	
 	$EnterpriseAdminTable.Add($obj)
 }
 
 $DefaultComputersOU = (Get-ADDomain).computerscontainer
 $DefaultComputers = Get-ADComputer -Filter * -Properties * -SearchBase "$DefaultComputersOU"
 
-foreach($DefaultComputer in $DefaultComputers) {
-
+foreach ($DefaultComputer in $DefaultComputers)
+{
+	
 	$obj = [PSCustomObject]@{
-
+		
 		'Name' = $DefaultComputer.Name
 		'Enabled' = $DefaultComputer.Enabled
 		'Operating System' = $DefaultComputer.OperatingSystem
@@ -337,17 +366,18 @@ foreach($DefaultComputer in $DefaultComputers) {
 		'Password Last Set' = $DefaultComputer.PasswordLastSet
 		'Protect from Deletion' = $DefaultComputer.ProtectedFromAccidentalDeletion
 	}
-
+	
 	$DefaultComputersinDefaultOUTable.Add($obj)
 }
 
 $DefaultUsersOU = (Get-ADDomain).UsersContainer
-$DefaultUsers = $Allusers | where {$_.DistinguishedName -like "*$($DefaultUsersOU)"} | Select-Object Name, UserPrincipalName, Enabled, ProtectedFromAccidentalDeletion, EmailAddress, @{ Name = 'lastlogon'; Expression = { LastLogonConvert $_.lastlogon } }, DistinguishedName
+$DefaultUsers = $Allusers | Where-Object { $_.DistinguishedName -like "*$($DefaultUsersOU)" } | Select-Object Name, UserPrincipalName, Enabled, ProtectedFromAccidentalDeletion, EmailAddress, @{ Name = 'lastlogon'; Expression = { LastLogonConvert $_.lastlogon } }, DistinguishedName
 
-foreach($DefaultUser in $DefaultUsers) {
-
+foreach ($DefaultUser in $DefaultUsers)
+{
+	
 	$obj = [PSCustomObject]@{
-
+		
 		'Name' = $DefaultUser.Name
 		'UserPrincipalName' = $DefaultUser.UserPrincipalName
 		'Enabled' = $DefaultUser.Enabled
@@ -355,35 +385,37 @@ foreach($DefaultUser in $DefaultUsers) {
 		'Last Logon' = $DefaultUser.LastLogon
 		'Email Address' = $DefaultUser.EmailAddress
 	}
-
+	
 	$DefaultUsersinDefaultOUTable.Add($obj)
 }
 
 #Expiring Accounts
-$LooseUsers = Search-ADAccount -AccountExpiring -UsersOnly 
+$LooseUsers = Search-ADAccount -AccountExpiring -UsersOnly
 
-foreach($LooseUser in $LooseUsers) {
-
-	$NameLoose 		= $LooseUser.Name
-	$UPNLoose 		= $LooseUser.UserPrincipalName
+foreach ($LooseUser in $LooseUsers)
+{
+	
+	$NameLoose = $LooseUser.Name
+	$UPNLoose = $LooseUser.UserPrincipalName
 	$ExpirationDate = $LooseUser.AccountExpirationDate
-	$enabled 		= $LooseUser.Enabled
-
+	$enabled = $LooseUser.Enabled
+	
 	$obj = [PSCustomObject]@{
-
-		'Name'					   = $NameLoose
-		'UserPrincipalName'	       = $UPNLoose
-		'Expiration Date'		   = $ExpirationDate
-		'Enabled' 				   = $enabled
+		
+		'Name'			    = $NameLoose
+		'UserPrincipalName' = $UPNLoose
+		'Expiration Date'   = $ExpirationDate
+		'Enabled'		    = $enabled
 	}
-
+	
 	$ExpiringAccountsTable.Add($obj)
 }
 
-if(($ExpiringAccountsTable).Count -eq 0) {
-
+if (($ExpiringAccountsTable).Count -eq 0)
+{
+	
 	$ExpiringAccountsTable = [PSCustomObject]@{
-
+		
 		Information = 'Information: No Users were found to expire soon'
 	}
 }
@@ -391,41 +423,45 @@ if(($ExpiringAccountsTable).Count -eq 0) {
 #Security Logs
 $SecurityLogs = Get-EventLog -Newest 7 -LogName "Security" | Where-Object { $_.Message -like "*An account*" }
 
-foreach($SecurityLog in $SecurityLogs) {
-
-	$TimeGenerated 	= $SecurityLog.TimeGenerated
-	$EntryType 		= $SecurityLog.EntryType
-	$Recipient 		= $SecurityLog.Message
-
+foreach ($SecurityLog in $SecurityLogs)
+{
+	
+	$TimeGenerated = $SecurityLog.TimeGenerated
+	$EntryType = $SecurityLog.EntryType
+	$Recipient = $SecurityLog.Message
+	
 	$obj = [PSCustomObject]@{
-
-		'Time'  	= $TimeGenerated
-		'Type' 		= $EntryType
-		'Message'	= $Recipient
+		
+		'Time'    = $TimeGenerated
+		'Type'    = $EntryType
+		'Message' = $Recipient
 	}
-
+	
 	$SecurityEventTable.Add($obj)
 }
 
-if(($securityeventtable).Count -eq 0) {
-
+if (($securityeventtable).Count -eq 0)
+{
+	
 	$securityeventtable = [PSCustomObject]@{
-
+		
 		Information = 'Information: No recent security logs'
 	}
 }
 
 #Tenant Domain
 $Domains = Get-ADForest | Select-Object -ExpandProperty upnsuffixes | ForEach-Object{
-
+	
 	$obj = [PSCustomObject]@{
-
+		
 		'UPN Suffixes' = $_
-		 Valid		   = "True"
+		Valid		   = "True"
 	}
-
+	
 	$DomainTable.Add($obj)
 }
+
+Write-Host "Done!" -ForegroundColor White
 
 <###########################
 
@@ -433,120 +469,136 @@ $Domains = Get-ADForest | Select-Object -ExpandProperty upnsuffixes | ForEach-Ob
 
 ############################>
 
+Write-Host "Working on Groups Report..." -ForegroundColor Green
+
 #Get groups and sort in alphabetical order
-$Groups = Get-ADGroup -Filter * -Properties * 
-$SecurityCount 			= 0
-$MailSecurityCount 		= 0
-$CustomGroup 			= 0
-$DefaultGroup 			= 0
-$Groupswithmemebrship 	= 0
+$Groups = Get-ADGroup -Filter * -Properties *
+$SecurityCount = 0
+$MailSecurityCount = 0
+$CustomGroup = 0
+$DefaultGroup = 0
+$Groupswithmemebrship = 0
 $Groupswithnomembership = 0
-$GroupsProtected 		= 0
-$GroupsNotProtected     = 0
+$GroupsProtected = 0
+$GroupsNotProtected = 0
 
-foreach($Group in $Groups) {
-
+foreach ($Group in $Groups)
+{
+	
 	$DefaultADGroup = 'False'
 	$Type = New-Object 'System.Collections.Generic.List[System.Object]'
 	$Gemail = (Get-ADGroup $Group -Properties mail).mail
-
-	if(($group.GroupCategory -eq "Security") -and ($Gemail -ne $Null)) {
-
+	
+	if (($group.GroupCategory -eq "Security") -and ($Gemail -ne $Null))
+	{
+		
 		$MailSecurityCount++
 	}
-
-	if(($group.GroupCategory -eq "Security") -and (($Gemail) -eq $Null)) {
-
+	
+	if (($group.GroupCategory -eq "Security") -and (($Gemail) -eq $Null))
+	{
+		
 		$SecurityCount++
 	}
-
-	if($Group.ProtectedFromAccidentalDeletion -eq $True) {
-
+	
+	if ($Group.ProtectedFromAccidentalDeletion -eq $True)
+	{
+		
 		$GroupsProtected++
 	}
-
-	else {
-
+	
+	else
+	{
+		
 		$GroupsNotProtected++
 	}
-
-	if($DefaultSGs -contains $Group.Name) {
-
-		Write-Host "$($Group.name) is a default group"
+	
+	if ($DefaultSGs -contains $Group.Name)
+	{
+		
 		$DefaultADGroup = "True"
 		$DefaultGroup++
 	}
-
-	else {
-
+	
+	else
+	{
+		
 		$CustomGroup++
 	}
-
-	if($group.GroupCategory -eq "Distribution") {
-
+	
+	if ($group.GroupCategory -eq "Distribution")
+	{
+		
 		$Type = "Distribution Group"
 	}
-
-	if(($group.GroupCategory -eq "Security") -and (($Gemail) -eq $Null)) {
-
+	
+	if (($group.GroupCategory -eq "Security") -and (($Gemail) -eq $Null))
+	{
+		
 		$Type = "Security Group"
 	}
-
-	if(($group.GroupCategory -eq "Security") -and (($Gemail) -ne $Null)) {
-
+	
+	if (($group.GroupCategory -eq "Security") -and (($Gemail) -ne $Null))
+	{
+		
 		$Type = "Mail-Enabled Security Group"
 	}
-
-	if($Group.Name -ne "Domain Users") {
-
+	
+	if ($Group.Name -ne "Domain Users")
+	{
+		
 		$Users = (Get-ADGroupMember -Identity $Group | Sort-Object DisplayName | Select-Object -ExpandProperty Name) -join ", "
-
-		if(!($Users)) {
-
-				$Groupswithnomembership++
-			}
-
-			else {
-
-				$Groupswithmemebrship++
-
-			}
+		
+		if (!($Users))
+		{
+			
+			$Groupswithnomembership++
 		}
-
-		else {
-
-			$Users = "Skipped Domain Users Membership"
+		
+		else
+		{
+			
+			$Groupswithmemebrship++
+			
 		}
-
-    $OwnerDN = Get-ADGroup -Filter { name -eq $Group.Name }  -Properties managedBy | Select-Object -ExpandProperty ManagedBy
-	$Manager = $AllUsers | Where-Object { $_.distinguishedname -eq $OwnerDN } | Select-Object -ExpandProperty Name
-
-	$obj = [PSCustomObject]@{
-
-		'Name'		     	= $Group.name
-		'Type'		     	= $Type
-		'Members' 		 	= $users
-		'Managed By'	 	= $Manager
-		'E-mail Address' 	= $GEmail
-		'Protected from Deletion' = $Group.ProtectedFromAccidentalDeletion
-		'Default AD Group' 	= $DefaultADGroup
 	}
-
+	
+	else
+	{
+		
+		$Users = "Skipped Domain Users Membership"
+	}
+	
+	$OwnerDN = Get-ADGroup -Filter { name -eq $Group.Name } -Properties managedBy | Select-Object -ExpandProperty ManagedBy
+	$Manager = $AllUsers | Where-Object { $_.distinguishedname -eq $OwnerDN } | Select-Object -ExpandProperty Name
+	
+	$obj = [PSCustomObject]@{
+		
+		'Name' = $Group.name
+		'Type' = $Type
+		'Members' = $users
+		'Managed By' = $Manager
+		'E-mail Address' = $GEmail
+		'Protected from Deletion' = $Group.ProtectedFromAccidentalDeletion
+		'Default AD Group' = $DefaultADGroup
+	}
+	
 	$table.Add($obj)
 }
 
-if(($table).Count -eq 0) {
-
+if (($table).Count -eq 0)
+{
+	
 	$table = [PSCustomObject]@{
-
+		
 		Information = 'Information: No Groups were found'
 	}
 }
 
 #TOP groups table
 $obj1 = [PSCustomObject]@{
-
-	'Total Groups'  = $Groups.Count
+	
+	'Total Groups' = $Groups.Count
 	'Mail-Enabled Security Groups' = $MailSecurityCount
 	'Security Groups' = $SecurityCount
 	'Distribution Groups' = $DistroCount
@@ -555,7 +607,7 @@ $obj1 = [PSCustomObject]@{
 $TOPGroupsTable.Add($obj1)
 
 $obj1 = [PSCustomObject]@{
-
+	
 	'Name'  = 'Mail-Enabled Security Groups'
 	'Count' = $MailSecurityCount
 }
@@ -563,7 +615,7 @@ $obj1 = [PSCustomObject]@{
 $GroupTypetable.Add($obj1)
 
 $obj1 = [PSCustomObject]@{
-
+	
 	'Name'  = 'Security Groups'
 	'Count' = $SecurityCount
 }
@@ -572,7 +624,7 @@ $GroupTypetable.Add($obj1)
 $DistroCount = ($Groups | Where-Object { $_.GroupCategory -eq "Distribution" }).Count
 
 $obj1 = [PSCustomObject]@{
-
+	
 	'Name'  = 'Distribution Groups'
 	'Count' = $DistroCount
 }
@@ -581,7 +633,7 @@ $GroupTypetable.Add($obj1)
 
 #Default Group Pie Chart
 $obj1 = [PSCustomObject]@{
-
+	
 	'Name'  = 'Default Groups'
 	'Count' = $DefaultGroup
 }
@@ -589,7 +641,7 @@ $obj1 = [PSCustomObject]@{
 $DefaultGrouptable.Add($obj1)
 
 $obj1 = [PSCustomObject]@{
-
+	
 	'Name'  = 'Custom Groups'
 	'Count' = $CustomGroup
 }
@@ -598,7 +650,7 @@ $DefaultGrouptable.Add($obj1)
 
 #Group Protection Pie Chart
 $obj1 = [PSCustomObject]@{
-
+	
 	'Name'  = 'Protected'
 	'Count' = $GroupsProtected
 }
@@ -606,7 +658,7 @@ $obj1 = [PSCustomObject]@{
 $GroupProtectionTable.Add($obj1)
 
 $obj1 = [PSCustomObject]@{
-
+	
 	'Name'  = 'Not Protected'
 	'Count' = $GroupsNotProtected
 }
@@ -615,7 +667,7 @@ $GroupProtectionTable.Add($obj1)
 
 #Groups with membership vs no membership pie chart
 $objmem = [PSCustomObject]@{
-
+	
 	'Name'  = 'With Members'
 	'Count' = $Groupswithmemebrship
 }
@@ -623,12 +675,14 @@ $objmem = [PSCustomObject]@{
 $GroupMembershipTable.Add($objmem)
 
 $objmem = [PSCustomObject]@{
-
+	
 	'Name'  = 'No Members'
 	'Count' = $Groupswithnomembership
 }
 
 $GroupMembershipTable.Add($objmem)
+
+Write-Host "Done!" -ForegroundColor White
 
 <###########################
 
@@ -636,69 +690,78 @@ $GroupMembershipTable.Add($objmem)
 
 ############################>
 
+Write-Host "Working on Organizational Units Report..." -ForegroundColor Green
+
 #Get all OU's'
-$OUs = Get-ADOrganizationalUnit -Filter * -Properties * 
+$OUs = Get-ADOrganizationalUnit -Filter * -Properties *
 $OUwithLinked = 0
 $OUwithnoLink = 0
-$OUProtected  = 0
+$OUProtected = 0
 $OUNotProtected = 0
 
-foreach($OU in $OUs) {
-
+foreach ($OU in $OUs)
+{
+	
 	$LinkedGPOs = New-Object 'System.Collections.Generic.List[System.Object]'
-
-	if(($OU.linkedgrouppolicyobjects).length -lt 1) {
-
+	
+	if (($OU.linkedgrouppolicyobjects).length -lt 1)
+	{
+		
 		$LinkedGPOs = "None"
 		$OUwithnoLink++
 	}
-
-	else {
-
+	
+	else
+	{
+		
 		$OUwithLinked++
-		$GPOs = $OU.linkedgrouppolicyobjects
-
-		foreach($GPO in $GPOs) {
-
-			$Split1 = $GPO -split "{" | Select-Object -Last 1
+		$GPOslinks = $OU.linkedgrouppolicyobjects
+		
+		foreach ($GPOlink in $GPOslinks)
+		{
+			
+			$Split1 = $GPOlink -split "{" | Select-Object -Last 1
 			$Split2 = $Split1 -split "}" | Select-Object -First 1
-			$LinkedGPOs.Add((Get-GPO -Guid $Split2 -ErrorAction SilentlyContinue).DisplayName )
+			$LinkedGPOs.Add((Get-GPO -Guid $Split2 -ErrorAction SilentlyContinue).DisplayName)
 		}
 	}
-
-	if($OU.ProtectedFromAccidentalDeletion -eq $True) {
-
+	
+	if ($OU.ProtectedFromAccidentalDeletion -eq $True)
+	{
+		
 		$OUProtected++
 	}
-
-	else {
-
+	
+	else
+	{
+		
 		$OUNotProtected++
 	}
-
+	
 	$LinkedGPOs = $LinkedGPOs -join ", "
 	$obj = [PSCustomObject]@{
-
-		'Name'			      		= $OU.Name
-		'Linked GPOs'	      		= $LinkedGPOs
-		'Modified Date'		  		= $OU.WhenChanged
-		'Protected from Deletion' 	= $OU.ProtectedFromAccidentalDeletion
+		
+		'Name' = $OU.Name
+		'Linked GPOs' = $LinkedGPOs
+		'Modified Date' = $OU.WhenChanged
+		'Protected from Deletion' = $OU.ProtectedFromAccidentalDeletion
 	}
-
+	
 	$OUTable.Add($obj)
 }
 
-if(($OUTable).Count -eq 0) {
-
+if (($OUTable).Count -eq 0)
+{
+	
 	$OUTable = [PSCustomObject]@{
-
+		
 		Information = 'Information: No Organizational Units were found'
 	}
 }
 
 #OUs with no GPO Linked
 $obj1 = [PSCustomObject]@{
-
+	
 	'Name'  = "OU's with no GPO's linked"
 	'Count' = $OUwithnoLink
 }
@@ -706,7 +769,7 @@ $obj1 = [PSCustomObject]@{
 $OUGPOTable.Add($obj1)
 
 $obj2 = [PSCustomObject]@{
-
+	
 	'Name'  = "OU's with GPO's linked"
 	'Count' = $OUwithLinked
 }
@@ -715,7 +778,7 @@ $OUGPOTable.Add($obj2)
 
 #OUs Protected Pie Chart
 $obj1 = [PSCustomObject]@{
-
+	
 	'Name'  = "Protected"
 	'Count' = $OUProtected
 }
@@ -723,12 +786,14 @@ $obj1 = [PSCustomObject]@{
 $OUProtectionTable.Add($obj1)
 
 $obj2 = [PSCustomObject]@{
-
+	
 	'Name'  = "Not Protected"
 	'Count' = $OUNotProtected
 }
 
 $OUProtectionTable.Add($obj2)
+
+Write-Host "Done!" -ForegroundColor White
 
 <###########################
 
@@ -736,163 +801,181 @@ $OUProtectionTable.Add($obj2)
 
 ############################>
 
-$UserEnabled 				= 0
-$UserDisabled 				= 0
-$UserPasswordExpires 		= 0
-$UserPasswordNeverExpires 	= 0
-$ProtectedUsers 			= 0
-$NonProtectedUsers          = 0
+Write-Host "Working on Users Report..." -ForegroundColor Green
+
+$UserEnabled = 0
+$UserDisabled = 0
+$UserPasswordExpires = 0
+$UserPasswordNeverExpires = 0
+$ProtectedUsers = 0
+$NonProtectedUsers = 0
 
 $UsersWIthPasswordsExpiringInUnderAWeek = 0
 $UsersNotLoggedInOver30Days = 0
 $AccountsExpiringSoon = 0
 
-foreach($User in $AllUsers) {
-
-	$AttVar = $AllUsers | Where { $_.name -eq $User.Name} | Select-Object Enabled, PasswordExpired, PasswordLastSet, PasswordNeverExpires, PasswordNotRequired, Name, SamAccountName, EmailAddress, AccountExpirationDate, @{ Name = 'lastlogon'; Expression = { LastLogonConvert $_.lastlogon } }, DistinguishedName
+foreach ($User in $AllUsers)
+{
+	
+	$AttVar = $User | Select-Object Enabled, PasswordExpired, PasswordLastSet, PasswordNeverExpires, PasswordNotRequired, Name, SamAccountName, EmailAddress, AccountExpirationDate, @{ Name = 'lastlogon'; Expression = { LastLogonConvert $_.lastlogon } }, DistinguishedName
 	$maxPasswordAge = (Get-ADDefaultDomainPasswordPolicy).MaxPasswordAge
-
-	if((($AttVar.PasswordNeverExpires) -eq $False) -and (($AttVar.Enabled) -ne $false)) {
-
+	
+	if ((($AttVar.PasswordNeverExpires) -eq $False) -and (($AttVar.Enabled) -ne $false))
+	{
+		
 		#Get Password last set date
-		$passwordSetDate = ($AllUsers | ForEach-Object { $_.PasswordLastSet })
-
-		if($null -eq $passwordSetDate) {
-
+		$passwordSetDate = ($User | ForEach-Object { $_.PasswordLastSet })
+		
+		if ($null -eq $passwordSetDate)
+		{
+			
 			$daystoexpire = "User has never logged on"
 		}
-
-		else {
-
+		
+		else
+		{
+			
 			#Check for Fine Grained Passwords
 			$PasswordPol = (Get-ADUserResultantPasswordPolicy $user)
-
-			if(($PasswordPol) -ne $null) {
-
+			
+			if (($PasswordPol) -ne $null)
+			{
+				
 				$maxPasswordAge = ($PasswordPol).MaxPasswordAge
 			}
-
+			
 			$expireson = $passwordsetdate + $maxPasswordAge
 			$today = (Get-Date)
-
+			
 			#Gets the count on how many days until the password expires and stores it in the $daystoexpire var
 			$daystoexpire = (New-TimeSpan -Start $today -End $Expireson).Days
 		}
 	}
-
-	else {
-
+	
+	else
+	{
+		
 		$daystoexpire = "N/A"
 	}
-
+	
 	#Get users that haven't logged on in X amount of days, var is set at start of script
-	if(($User.Enabled -eq $True) -and ($User.LastLogonDate -lt (Get-Date).AddDays(-$Days)) -and ($User.LastLogonDate -ne $NULL)) {
-
+	if (($User.Enabled -eq $True) -and ($User.LastLogonDate -lt (Get-Date).AddDays(- $Days)) -and ($User.LastLogonDate -ne $NULL))
+	{
+		
 		$obj = [PSCustomObject]@{
-
-			'Name'					      	= $User.Name
-			'UserPrincipalName'		      	= $User.UserPrincipalName
-			'Enabled'					  	= $AttVar.Enabled
-			'Protected from Deletion'		= $User.ProtectedFromAccidentalDeletion
-			'Last Logon'				  	= $AttVar.lastlogon
-			'Password Never Expires' 		= $AttVar.PasswordNeverExpires
-			'Days Until Password Expires' 	= $daystoexpire
+			
+			'Name' = $User.Name
+			'UserPrincipalName' = $User.UserPrincipalName
+			'Enabled' = $AttVar.Enabled
+			'Protected from Deletion' = $User.ProtectedFromAccidentalDeletion
+			'Last Logon' = $AttVar.lastlogon
+			'Password Never Expires' = $AttVar.PasswordNeverExpires
+			'Days Until Password Expires' = $daystoexpire
 		}
-
+		
 		$userphaventloggedonrecentlytable.Add($obj)
 	}
-
-	if(($userphaventloggedonrecentlytable).Count -eq 0) {
-
+	
+	if (($userphaventloggedonrecentlytable).Count -eq 0)
+	{
+		
 		$userphaventloggedonrecentlytable = [PSCustomObject]@{
-
-		    Information = "Information: No Users were found to have not logged on in $Days days"
+			
+			Information = "Information: No Users were found to have not logged on in $Days days"
 		}
 	}
-
+	
 	#Items for protected vs non protected users
-	if($User.ProtectedFromAccidentalDeletion -eq $False) {
-
+	if ($User.ProtectedFromAccidentalDeletion -eq $False)
+	{
+		
 		$NonProtectedUsers++
 	}
-
-	else {
-
+	
+	else
+	{
+		
 		$ProtectedUsers++
 	}
-
+	
 	#Items for the enabled vs disabled users pie chart
-	if(($AttVar.PasswordNeverExpires) -ne $false) {
-
+	if (($AttVar.PasswordNeverExpires) -ne $false)
+	{
+		
 		$UserPasswordNeverExpires++
 	}
-
-	else {
-
+	
+	else
+	{
+		
 		$UserPasswordExpires++
 	}
-
+	
 	#Items for password expiration pie chart
-	if(($AttVar.Enabled) -ne $false) {
-
+	if (($AttVar.Enabled) -ne $false)
+	{
+		
 		$UserEnabled++
 	}
-
-	else {
-
+	
+	else
+	{
+		
 		$UserDisabled++
 	}
-
-	$Name 					= $User.Name
-	$UPN 					= $User.UserPrincipalName
-	$Enabled 				= $AttVar.Enabled
-	$EmailAddress 			= $AttVar.EmailAddress
-	$AccountExpiration 		= $AttVar.AccountExpirationDate
-	$PasswordExpired 		= $AttVar.PasswordExpired
-	$PasswordLastSet 		= $AttVar.PasswordLastSet
-	$PasswordNeverExpires 	= $AttVar.PasswordNeverExpires
-	$daysUntilPWExpire 		= $daystoexpire
-
+	
+	$Name = $User.Name
+	$UPN = $User.UserPrincipalName
+	$Enabled = $AttVar.Enabled
+	$EmailAddress = $AttVar.EmailAddress
+	$AccountExpiration = $AttVar.AccountExpirationDate
+	$PasswordExpired = $AttVar.PasswordExpired
+	$PasswordLastSet = $AttVar.PasswordLastSet
+	$PasswordNeverExpires = $AttVar.PasswordNeverExpires
+	$daysUntilPWExpire = $daystoexpire
+	
 	$obj = [PSCustomObject]@{
-
-		'Name'						   	= $Name
-		'UserPrincipalName'		       	= $UPN
-		'Enabled'						= $Enabled
-		'Protected from Deletion' 		= $User.ProtectedFromAccidentalDeletion
-		'Last Logon'				   	= $LastLogon
-		'Email Address' 				= $EmailAddress
-		'Account Expiration'			= $AccountExpiration
-		'Change Password Next Logon'  	= $PasswordExpired
-		'Password Last Set'  			= $PasswordLastSet
-		'Password Never Expires' 		= $PasswordNeverExpires
-		'Days Until Password Expires'   = $daystoexpire
+		
+		'Name'				      = $Name
+		'UserPrincipalName'	      = $UPN
+		'Enabled'				  = $Enabled
+		'Protected from Deletion' = $User.ProtectedFromAccidentalDeletion
+		'Last Logon'			  = $LastLogon
+		'Email Address'		      = $EmailAddress
+		'Account Expiration'	  = $AccountExpiration
+		'Change Password Next Logon' = $PasswordExpired
+		'Password Last Set'	      = $PasswordLastSet
+		'Password Never Expires'  = $PasswordNeverExpires
+		'Days Until Password Expires' = $daystoexpire
 	}
-
+	
 	$usertable.Add($obj)
-
-	if($daystoexpire -lt $DaysUntilPWExpireINT) {
-
+	
+	if ($daystoexpire -lt $DaysUntilPWExpireINT)
+	{
+		
 		$obj = [PSCustomObject]@{
-
+			
 			'Name'					      = $Name
 			'Days Until Password Expires' = $daystoexpire
 		}
-
+		
 		$PasswordExpireSoonTable.Add($obj)
 	}
 }
 
-if(($usertable).Count -eq 0) {
-
+if (($usertable).Count -eq 0)
+{
+	
 	$usertable = [PSCustomObject]@{
-
+		
 		Information = 'Information: No Users were found'
 	}
 }
 
 #Data for users enabled vs disabled pie graph
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = 'Enabled'
 	'Count' = $UserEnabled
 }
@@ -900,7 +983,7 @@ $objULic = [PSCustomObject]@{
 $EnabledDisabledUsersTable.Add($objULic)
 
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = 'Disabled'
 	'Count' = $UserDisabled
 }
@@ -909,7 +992,7 @@ $EnabledDisabledUsersTable.Add($objULic)
 
 #Data for users password expires pie graph
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = 'Password Expires'
 	'Count' = $UserPasswordExpires
 }
@@ -917,7 +1000,7 @@ $objULic = [PSCustomObject]@{
 $PasswordExpirationTable.Add($objULic)
 
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = 'Password Never Expires'
 	'Count' = $UserPasswordNeverExpires
 }
@@ -926,7 +1009,7 @@ $PasswordExpirationTable.Add($objULic)
 
 #Data for protected users pie graph
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = 'Protected'
 	'Count' = $ProtectedUsers
 }
@@ -934,7 +1017,7 @@ $objULic = [PSCustomObject]@{
 $ProtectedUsersTable.Add($objULic)
 
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = 'Not Protected'
 	'Count' = $NonProtectedUsers
 }
@@ -942,45 +1025,64 @@ $objULic = [PSCustomObject]@{
 $ProtectedUsersTable.Add($objULic)
 
 #TOP User table
-$objULic = [PSCustomObject]@{
-
-	'Total Users'  = $AllUsers.Count
-	"Users with Passwords Expiring in less than $DaysUntilPWExpireINT days" = $PasswordExpireSoonTable.Count
-	'Expiring Accounts' = $ExpiringAccountsTable.Count
-	"Users Haven't Logged on in $Days Days" = $userphaventloggedonrecentlytable.Count
+If (($ExpiringAccountsTable).Count -gt 0)
+{
+	
+	$objULic = [PSCustomObject]@{
+		'Total Users' = $AllUsers.Count
+		"Users with Passwords Expiring in less than $DaysUntilPWExpireINT days" = $PasswordExpireSoonTable.Count
+		'Expiring Accounts' = $ExpiringAccountsTable.Count
+		"Users Haven't Logged on in $Days Days" = $userphaventloggedonrecentlytable.Count
+	}
+	
+	$TOPUserTable.Add($objULic)
+	
+	
+}
+Else
+{
+	
+	$objULic = [PSCustomObject]@{
+		'Total Users' = $AllUsers.Count
+		"Users with Passwords Expiring in less than $DaysUntilPWExpireINT days" = $PasswordExpireSoonTable.Count
+		'Expiring Accounts' = "0"
+		"Users Haven't Logged on in $Days Days" = $userphaventloggedonrecentlytable.Count
+	}
+	$TOPUserTable.Add($objULic)
 }
 
-$TOPUserTable.Add($objULic)
-
+Write-Host "Done!" -ForegroundColor White
 <###########################
 
 	   Group Policy
 
 ############################>
+Write-Host "Working on Group Policy Report..." -ForegroundColor Green
 
 $GPOTable = New-Object 'System.Collections.Generic.List[System.Object]'
 
-$GPOs = Get-GPO -all | Select-Object DisplayName, GPOStatus, ModificationTime, @{ Label = "ComputerVersion"; Expression = { $_.computer.dsversion } }, @{ Label = "UserVersion"; Expression = { $_.user.dsversion } }
-
-foreach($GPO in $GPOs) {
-
+foreach ($GPO in $GPOs)
+{
+	
 	$obj = [PSCustomObject]@{
-
+		
 		'Name' = $GPO.DisplayName
 		'Status' = $GPO.GpoStatus
 		'Modified Date' = $GPO.ModificationTime
 		'User Version' = $GPO.UserVersion
 		'Computer Version' = $GPO.ComputerVersion
 	}
-
+	
 	$GPOTable.Add($obj)
 }
-
+Write-Host "Done!" -ForegroundColor White
 <###########################
 
 	   Computers
 
 ############################>
+Write-Host "Working on Computers Report..." -ForegroundColor Green
+
 $Computers = Get-ADComputer -Filter * -Properties *
 $ComputersProtected = 0
 $ComputersNotProtected = 0
@@ -995,30 +1097,35 @@ $Windows8 = 0
 $Windows7 = 0
 $Server2012R2 = 0
 
-foreach($Computer in $Computers) {
-
-	if($Computer.ProtectedFromAccidentalDeletion -eq $True) {
-
+foreach ($Computer in $Computers)
+{
+	
+	if ($Computer.ProtectedFromAccidentalDeletion -eq $True)
+	{
+		
 		$ComputersProtected++
 	}
-
-	else {
-
+	
+	else
+	{
+		
 		$ComputersNotProtected++
 	}
-
-	if($Computer.Enabled -eq $True) {
-
+	
+	if ($Computer.Enabled -eq $True)
+	{
+		
 		$ComputerEnabled++
 	}
-
-	else {
-
+	
+	else
+	{
+		
 		$ComputerDisabled++
 	}
-
+	
 	$obj = [PSCustomObject]@{
-
+		
 		'Name' = $Computer.Name
 		'Enabled' = $Computer.Enabled
 		'Operating System' = $Computer.OperatingSystem
@@ -1026,79 +1133,87 @@ foreach($Computer in $Computers) {
 		'Password Last Set' = $Computer.PasswordLastSet
 		'Protect from Deletion' = $Computer.ProtectedFromAccidentalDeletion
 	}
-
+	
 	$ComputersTable.Add($obj)
-
-	if($Computer.OperatingSystem -like "*Server 2016*") {
-
+	
+	if ($Computer.OperatingSystem -like "*Server 2016*")
+	{
+		
 		$Server2016++
 	}
-
-	elseif($Computer.OperatingSystem -like "*Server 2012 R2*") {
-
+	
+	elseif ($Computer.OperatingSystem -like "*Server 2012 R2*")
+	{
+		
 		$Server2012R2++
 	}
-
-	elseif($Computer.OperatingSystem -like "*Server 2012*") {
-
+	
+	elseif ($Computer.OperatingSystem -like "*Server 2012*")
+	{
+		
 		$Server2012++
 	}
-
-	elseif($Computer.OperatingSystem -like "*Server 2008 R2*") {
-
+	
+	elseif ($Computer.OperatingSystem -like "*Server 2008 R2*")
+	{
+		
 		$Server2008R2++
 	}
-
-	elseif($Computer.OperatingSystem -like "*Windows 10*") {
-
+	
+	elseif ($Computer.OperatingSystem -like "*Windows 10*")
+	{
+		
 		$Windows10++
 	}
-
-	elseif($Computer.OperatingSystem -like "*Windows 8*") {
-
+	
+	elseif ($Computer.OperatingSystem -like "*Windows 8*")
+	{
+		
 		$Windows8++
 	}
-
-	elseif($Computer.OperatingSystem -like "*Windows 7*") {
-
+	
+	elseif ($Computer.OperatingSystem -like "*Windows 7*")
+	{
+		
 		$Windows7++
 	}
 }
 
-If(($ComputersTable).Count -eq 0) {
-
+If (($ComputersTable).Count -eq 0)
+{
+	
 	$ComputersTable = [PSCustomObject]@{
-
+		
 		Information = 'Information: No Computers were found'
 	}
 }
 
 #Data for TOP Computers data table
 $objULic = [PSCustomObject]@{
-
-	'Total Computers'  = $Computers.Count
+	
+	'Total Computers' = $Computers.Count
 	"Server 2016"	  = $Server2016
 	"Server 2012 R2"  = $Server2012R2
-	"Server 2012"  = $Server2012
+	"Server 2012"	  = $Server2012
 	"Server 2008 R2"  = $Server2008R2
 	"Windows 10"	  = $Windows10
 	"Windows 8"	      = $Windows8
-	"Windows 7" = $Windows7
+	"Windows 7"	      = $Windows7
 }
 
 $TOPComputersTable.Add($objULic)
 
 #Pie chart breaking down OS for computer obj
 $objULic = [PSCustomObject]@{
-
-	'Name' = "Server 2016"
-	"Count"	  = $Server2016
+	
+	'Name'  = "Server 2016"
+	"Count" = $Server2016
 }
 
 $GraphComputerOS.Add($objULic)
 
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = "Server 2012 R2"
 	"Count" = $Server2012R2
 }
@@ -1106,7 +1221,7 @@ $objULic = [PSCustomObject]@{
 $GraphComputerOS.Add($objULic)
 
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = "Server 2012"
 	"Count" = $Server2012
 }
@@ -1114,7 +1229,7 @@ $objULic = [PSCustomObject]@{
 $GraphComputerOS.Add($objULic)
 
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = "Server 2008 R2"
 	"Count" = $Server2008R2
 }
@@ -1122,7 +1237,7 @@ $objULic = [PSCustomObject]@{
 $GraphComputerOS.Add($objULic)
 
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = "Windows 10"
 	"Count" = $Windows10
 }
@@ -1130,7 +1245,7 @@ $objULic = [PSCustomObject]@{
 $GraphComputerOS.Add($objULic)
 
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = "Windows 8"
 	"Count" = $Windows8
 }
@@ -1138,7 +1253,7 @@ $objULic = [PSCustomObject]@{
 $GraphComputerOS.Add($objULic)
 
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = "Windows 7"
 	"Count" = $Windows7
 }
@@ -1147,7 +1262,7 @@ $GraphComputerOS.Add($objULic)
 
 #Data for protected Computers pie graph
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = 'Protected'
 	'Count' = $ComputerProtected
 }
@@ -1155,7 +1270,7 @@ $objULic = [PSCustomObject]@{
 $ComputerProtectedTable.Add($objULic)
 
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = 'Not Protected'
 	'Count' = $ComputersNotProtected
 }
@@ -1164,7 +1279,7 @@ $ComputerProtectedTable.Add($objULic)
 
 #Data for enabled/vs Computers pie graph
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = 'Enabled'
 	'Count' = $ComputerEnabled
 }
@@ -1172,14 +1287,18 @@ $objULic = [PSCustomObject]@{
 $ComputersEnabledTable.Add($objULic)
 
 $objULic = [PSCustomObject]@{
-
+	
 	'Name'  = 'Disabled'
 	'Count' = $ComputerDisabled
 }
 
 $ComputersEnabledTable.Add($objULic)
 
+Write-Host "Done!" -ForegroundColor White
+
 $tabarray = @('Dashboard', 'Groups', 'Organizational Units', 'Users', 'Group Policy', 'Computers')
+
+Write-Host "Compiling Report..." -ForegroundColor Green
 
 ##--OU Protection PIE CHART--##
 #Basic Properties 
@@ -1433,7 +1552,7 @@ $PieObjectGroupProtection.DataDefinition.DataValueColumnName = 'Count'
 #Dashboard Report
 $FinalReport = New-Object 'System.Collections.Generic.List[System.Object]'
 $FinalReport.Add($(Get-HTMLOpenPage -TitleText $ReportTitle -LeftLogoString $CompanyLogo -RightLogoString $RightLogo))
-$FinalReport.Add($(Get-HTMLTabHeader -TabNames $tabarray))))
+$FinalReport.Add($(Get-HTMLTabHeader -TabNames $tabarray))
 $FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[0] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
 $FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Company Information"))
 $FinalReport.Add($(Get-HTMLContentTable $CompanyInfoTable))
@@ -1562,90 +1681,90 @@ $FinalReport.Add($(Get-HTMLTabContentClose))
 $FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[3] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
 
 $FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Users Overivew"))
-$FinalReport.Add($(Get-HTMLContentTable $TOPUserTable -HideFooter
-$FinalReport.Add($(Get-HTMLContentClose))
-
-$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Active Directory Users"))
-$FinalReport.Add($(Get-HTMLContentDataTable $UserTable -HideFooter))
-$FinalReport.Add($(Get-HTMLContentClose))
-
-$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Expiring Items"))
-$FinalReport.Add($(Get-HTMLColumn1of2))
-$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users with Passwords Expiring in less than $DaysUntilPWExpireINT days"))
-$FinalReport.Add($(Get-HTMLContentDataTable $PasswordExpireSoonTable -HideFooter))
-$FinalReport.Add($(Get-HTMLContentClose))
-$FinalReport.Add($(Get-HTMLColumnClose))
-$FinalReport.Add($(Get-HTMLColumn2of2))
-$FinalReport.Add($(Get-HTMLContentOpen -HeaderText 'Accounts Expiring Soon'))
-$FinalReport.Add($(Get-HTMLContentDataTable $ExpiringAccountsTable -HideFooter))
-$FinalReport.Add($(Get-HTMLContentClose))
-$FinalReport.Add($(Get-HTMLColumnClose))
-$FinalReport.Add($(Get-HTMLContentClose))
-
-$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Accounts"))
-$FinalReport.Add($(Get-HTMLColumn1of2))
-$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days"))
-$FinalReport.Add($(Get-HTMLContentDataTable $userphaventloggedonrecentlytable -HideFooter))
-$FinalReport.Add($(Get-HTMLContentClose))
-$FinalReport.Add($(Get-HTMLColumnClose))
-$FinalReport.Add($(Get-HTMLColumn2of2))
-
-$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Accounts Created in $UserCreatedDays Days or Less"))
-$FinalReport.Add($(Get-HTMLContentDataTable $NewCreatedUsersTable -HideFooter))
-$FinalReport.Add($(Get-HTMLContentClose))
-$FinalReport.Add($(Get-HTMLColumnClose))
-$FinalReport.Add($(Get-HTMLContentClose))
-
-$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Users Charts"))
-$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 3))
-$FinalReport.Add($(Get-HTMLPieChart -ChartObject $EnabledDisabledUsersPieObject -DataSet $EnabledDisabledUsersTable))
-$FinalReport.Add($(Get-HTMLColumnClose))
-$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 3))
-$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PWExpiresUsersTable -DataSet $PasswordExpirationTable))
-$FinalReport.Add($(Get-HTMLColumnClose))
-$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 3 -ColumnCount 3))
-$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectProtectedUsers -DataSet $ProtectedUsersTable))
-$FinalReport.Add($(Get-HTMLColumnClose))
-$FinalReport.Add($(Get-HTMLContentClose))
-$FinalReport.Add($(Get-HTMLTabContentClose))
-
-#GPO Report
-$FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[4] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
-$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Group Policies"))
-$FinalReport.Add($(Get-HTMLContentDataTable $GPOTable -HideFooter))
-$FinalReport.Add($(Get-HTMLContentClose))
-$FinalReport.Add($(Get-HTMLTabContentClose))
-
-#Computers Report
-$FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[5] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
-
-$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers Overivew"))
-$FinalReport.Add($(Get-HTMLContentTable $TOPComputersTable -HideFooter))
-$FinalReport.Add($(Get-HTMLContentClose))
-
-$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers"))
-$FinalReport.Add($(Get-HTMLContentDataTable $ComputersTable -HideFooter))
-$FinalReport.Add($(Get-HTMLContentClose))
-
-$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers Charts"))
-$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 2))
-$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectComputersProtected -DataSet $ComputerProtectedTable))
-$FinalReport.Add($(Get-HTMLColumnClose))
-$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 2))
-$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectComputersEnabled -DataSet $ComputersEnabledTable))
-$FinalReport.Add($(Get-HTMLColumnClose))
-$FinalReport.Add($(Get-HTMLContentclose))
-
-$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers Operating System Breakdown"))
-$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectComputerObjOS -DataSet $GraphComputerOS))
-$FinalReport.Add($(Get-HTMLContentclose))
-
-$FinalReport.Add($(Get-HTMLTabContentClose))
-$FinalReport.Add($(Get-HTMLClosePage))
-
-$Day = (Get-Date).Day
-$Month = (Get-Date).Month
-$Year = (Get-Date).Year
-$ReportName = ("$Day - $Month - $Year - AD Report")
-
-Save-HTMLReport -ReportContent $FinalReport -ShowReport -ReportName $ReportName -ReportPath $ReportSavePath
+$FinalReport.Add($(Get-HTMLContentTable $TOPUserTable -HideFooter))
+		$FinalReport.Add($(Get-HTMLContentClose))
+		
+		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Active Directory Users"))
+		$FinalReport.Add($(Get-HTMLContentDataTable $UserTable -HideFooter))
+		$FinalReport.Add($(Get-HTMLContentClose))
+		
+		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Expiring Items"))
+		$FinalReport.Add($(Get-HTMLColumn1of2))
+		$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users with Passwords Expiring in less than $DaysUntilPWExpireINT days"))
+		$FinalReport.Add($(Get-HTMLContentDataTable $PasswordExpireSoonTable -HideFooter))
+		$FinalReport.Add($(Get-HTMLContentClose))
+		$FinalReport.Add($(Get-HTMLColumnClose))
+		$FinalReport.Add($(Get-HTMLColumn2of2))
+		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText 'Accounts Expiring Soon'))
+		$FinalReport.Add($(Get-HTMLContentDataTable $ExpiringAccountsTable -HideFooter))
+		$FinalReport.Add($(Get-HTMLContentClose))
+		$FinalReport.Add($(Get-HTMLColumnClose))
+		$FinalReport.Add($(Get-HTMLContentClose))
+		
+		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Accounts"))
+		$FinalReport.Add($(Get-HTMLColumn1of2))
+		$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days"))
+		$FinalReport.Add($(Get-HTMLContentDataTable $userphaventloggedonrecentlytable -HideFooter))
+		$FinalReport.Add($(Get-HTMLContentClose))
+		$FinalReport.Add($(Get-HTMLColumnClose))
+		$FinalReport.Add($(Get-HTMLColumn2of2))
+		
+		$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Accounts Created in $UserCreatedDays Days or Less"))
+		$FinalReport.Add($(Get-HTMLContentDataTable $NewCreatedUsersTable -HideFooter))
+		$FinalReport.Add($(Get-HTMLContentClose))
+		$FinalReport.Add($(Get-HTMLColumnClose))
+		$FinalReport.Add($(Get-HTMLContentClose))
+		
+		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Users Charts"))
+		$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 3))
+		$FinalReport.Add($(Get-HTMLPieChart -ChartObject $EnabledDisabledUsersPieObject -DataSet $EnabledDisabledUsersTable))
+		$FinalReport.Add($(Get-HTMLColumnClose))
+		$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 3))
+		$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PWExpiresUsersTable -DataSet $PasswordExpirationTable))
+		$FinalReport.Add($(Get-HTMLColumnClose))
+		$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 3 -ColumnCount 3))
+		$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectProtectedUsers -DataSet $ProtectedUsersTable))
+		$FinalReport.Add($(Get-HTMLColumnClose))
+		$FinalReport.Add($(Get-HTMLContentClose))
+		$FinalReport.Add($(Get-HTMLTabContentClose))
+		
+		#GPO Report
+		$FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[4] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
+		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Group Policies"))
+		$FinalReport.Add($(Get-HTMLContentDataTable $GPOTable -HideFooter))
+		$FinalReport.Add($(Get-HTMLContentClose))
+		$FinalReport.Add($(Get-HTMLTabContentClose))
+		
+		#Computers Report
+		$FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[5] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
+		
+		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers Overivew"))
+		$FinalReport.Add($(Get-HTMLContentTable $TOPComputersTable -HideFooter))
+		$FinalReport.Add($(Get-HTMLContentClose))
+		
+		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers"))
+		$FinalReport.Add($(Get-HTMLContentDataTable $ComputersTable -HideFooter))
+		$FinalReport.Add($(Get-HTMLContentClose))
+		
+		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers Charts"))
+		$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 2))
+		$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectComputersProtected -DataSet $ComputerProtectedTable))
+		$FinalReport.Add($(Get-HTMLColumnClose))
+		$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 2))
+		$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectComputersEnabled -DataSet $ComputersEnabledTable))
+		$FinalReport.Add($(Get-HTMLColumnClose))
+		$FinalReport.Add($(Get-HTMLContentclose))
+		
+		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers Operating System Breakdown"))
+		$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectComputerObjOS -DataSet $GraphComputerOS))
+		$FinalReport.Add($(Get-HTMLContentclose))
+		
+		$FinalReport.Add($(Get-HTMLTabContentClose))
+		$FinalReport.Add($(Get-HTMLClosePage))
+		
+		$Day = (Get-Date).Day
+		$Month = (Get-Date).Month
+		$Year = (Get-Date).Year
+		$ReportName = ("$Day - $Month - $Year - AD Report")
+		
+		Save-HTMLReport -ReportContent $FinalReport -ShowReport -ReportName $ReportName -ReportPath $ReportSavePath
