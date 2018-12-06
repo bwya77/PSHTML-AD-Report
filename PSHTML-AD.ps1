@@ -228,6 +228,7 @@ $AllDCUsers = foreach($DC in $DCs) {
     Get-ADUser -Server $DC -Filter * -Properties * | Sort Name
 }
 
+#Retrieve all users
 $AllUsers = $(
 
     #Select unique accountnames; all user data will be in multiples of the number of Domain Controllers you have
@@ -239,6 +240,9 @@ $AllUsers = $(
         ($AllDCUsers | Where { $_.SamAccountName -Match $U } | Sort LastLogon -Descending)[0]
     }
 )
+
+#Retrieve all computers
+$Computers = Get-ADComputer -Filter * -Properties *
 
 $GPOs = Get-GPO -All | Select-Object DisplayName, GPOStatus, ModificationTime, @{ Label = "ComputerVersion"; Expression = { $_.computer.dsversion } }, @{ Label = "UserVersion"; Expression = { $_.user.dsversion } }
 
@@ -399,7 +403,7 @@ foreach ($EnterpriseAdminsMember in $EnterpriseAdminsMembers)
 }
 
 $DefaultComputersOU = (Get-ADDomain).ComputersContainer
-$DefaultComputers = Get-ADComputer -Filter * -Properties * -SearchBase "$DefaultComputersOU"
+$DefaultComputers = $Computers | Where-Object { $_.DistinguishedName -like "*$($DefaultComputersOU)"}
 
 $Total = $DefaultComputers.Count
 
@@ -1172,7 +1176,6 @@ Write-Host "Done!" -ForegroundColor White
 ############################>
 Write-Host "Working on Computers Report..." -ForegroundColor Green
 
-$Computers = Get-ADComputer -Filter * -Properties *
 $ComputersProtected = 0
 $ComputersNotProtected = 0
 $ComputerEnabled = 0
