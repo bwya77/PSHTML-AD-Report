@@ -4,7 +4,9 @@ While I walk you through the report, you can view it for yourself [here](https:/
 
 Interactive HTML report generated with PowerShell to give you an overview of your Active Directory enviornment. 
 
-Requires ReportHTML module but will attempt to install on first run. Requires ActiveDirectory module to be present. 
+Requires ReportHTML and ActiveDirectory modules; will attempt to install ReportHTML on first run.
+
+Requires PowerShell Version 5.1 or above.
 
 ![Overview](https://thelazyadministrator.com/wp-content/uploads/2018/12/groups.png)
 

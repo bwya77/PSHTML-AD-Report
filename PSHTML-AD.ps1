@@ -47,37 +47,39 @@
 			  Bradley Wyatt 12/5/2018
 #>
 
+#Requires -Version 5.1
+#Requires -Module ActiveDirectory
 param (
 	
 	#Company logo that will be displayed on the left, can be URL or UNC
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter URL or UNC path to Company Logo")]
 	[String]$CompanyLogo = "",
-	#Logo that will be on the right side, UNC or URL
 
+	#Logo that will be on the right side, UNC or URL
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter URL or UNC path for Side Logo")]
 	[String]$RightLogo = "https://www.psmpartners.com/wp-content/uploads/2017/10/porcaro-stolarek-mete.png",
-	#Title of generated report
 
+	#Title of generated report
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired title for report")]
 	[String]$ReportTitle = "Active Directory Report",
-	#Location the report will be saved to
 
+	#Location the report will be saved to
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired directory path to save; Default: C:\Automation\")]
 	[String]$ReportSavePath = "C:\Automation\",
-	#Find users that have not logged in X Amount of days, this sets the days
 
+	#Find users that have not logged in X Amount of days, this sets the days
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have not logged in within [X] amount of days; Default: 1")]
 	$Days = 1,
-	#Get users who have been created in X amount of days and less
 
+	#Get users who have been created in X amount of days and less
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have been created within [X] amount of days; Default: 7")]
 	$UserCreatedDays = 7,
-	#Get users whos passwords expire in less than X amount of days
 
+	#Get users whos passwords expire in less than X amount of days
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users password expires within [X] amount of days; Default: 7")]
 	$DaysUntilPWExpireINT = 7,
-	#Get AD Objects that have been modified in X days and newer
 
+	#Get AD Objects that have been modified in X days and newer
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "AD Objects that have been modified within [X] amount of days; Default: 3")]
 	$ADModNumber = 3
 	
@@ -216,8 +218,31 @@ $TOPGroupsTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $TOPComputersTable = New-Object 'System.Collections.Generic.List[System.Object]'
 $GraphComputerOS = New-Object 'System.Collections.Generic.List[System.Object]'
 
-#Get all users right away. Instead of doing several lookups, we will use this object to look up all the information needed.
-$AllUsers = Get-ADUser -Filter * -Properties *
+#Retrieve all known Domain Controllers
+$DCs = (Get-ADDomainController -Filter *).Name
+
+#Loop through all Domain Controllers for user data; ensures most recent LastLogon attribute value is used for accuracy
+$AllDCUsers = foreach($DC in $DCs) {
+
+    #Get all AD User Data from each Domain Controller
+    Get-ADUser -Server $DC -Filter * -Properties * | Sort Name
+}
+
+#Retrieve all users
+$AllUsers = $(
+
+    #Select unique accountnames; all user data will be in multiples of the number of Domain Controllers you have
+    $Unique = ($AllDCUsers | Select SamAccountName -Unique | Sort SamAccountName).SamAccountName
+
+    foreach($U in $Unique) {
+
+        #Selects most recent LastLogon time User Object from all Domain Controllers AD User Data; LastLogon does NOT replicate across Domain Controllers
+        ($AllDCUsers | Where { $_.SamAccountName -Match $U } | Sort LastLogon -Descending)[0]
+    }
+)
+
+#Retrieve all computers
+$Computers = Get-ADComputer -Filter * -Properties *
 
 $GPOs = Get-GPO -All | Select-Object DisplayName, GPOStatus, ModificationTime, @{ Label = "ComputerVersion"; Expression = { $_.computer.dsversion } }, @{ Label = "UserVersion"; Expression = { $_.user.dsversion } }
 
@@ -228,12 +253,16 @@ $GPOs = Get-GPO -All | Select-Object DisplayName, GPOStatus, ModificationTime, @
 Write-Host "Working on Dashboard Report..." -ForegroundColor Green
 
 $dte = (Get-Date).AddDays(- $ADModNumber)
-
 $ADObjs = Get-ADObject -Filter { whenchanged -gt $dte -and ObjectClass -ne "domainDNS" -and ObjectClass -ne "rIDManager" -and ObjectClass -ne "rIDSet" } -Properties *
+
+$Current = 0
+$Total = $ADObjs.Count
 
 foreach ($ADObj in $ADObjs)
 {
-	
+    
+    Write-Progress -Activity "Processing $($Current++) of $($Total) AD Objects..." -Status ("Percent Complete:" + "{0:N0}" -f ((($Total - $Current) / $Total) * 100) + "%") -PercentComplete ((($Total - $Current) / $Total) * 100) -ErrorAction SilentlyContinue
+
 	if ($ADObj.ObjectClass -eq "GroupPolicyContainer")
 	{
 		
@@ -298,9 +327,13 @@ $CompanyInfoTable.Add($obj)
 $When = ((Get-Date).AddDays(- $UserCreatedDays)).Date
 $NewUsers = $AllUsers | Where-Object { $_.whenCreated -ge $When }
 
+$Total = $NewUsers.Count
+
 foreach ($Newuser in $Newusers)
 {
 	
+    Write-Progress -Activity "Processing $($Current++) of $($Total) New Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($Total - $Current) / $Total) * 100) + "%") -PercentComplete ((($Total - $Current) / $Total) * 100) -ErrorAction SilentlyContinue
+
 	$obj = [PSCustomObject]@{
 		
 		'Name' = $Newuser.Name
@@ -324,9 +357,13 @@ if (($NewCreatedUsersTable).Count -eq 0)
 #Get Domain Admins
 $DomainAdminMembers = Get-ADGroupMember "Domain Admins"
 
+$Total = $DomainAdminMembers.Count
+
 foreach ($DomainAdminMember in $DomainAdminMembers)
 {
 	
+    Write-Progress -Activity "Processing $($Current++) of $($Total) Domain Admins..." -Status ("Percent Complete:" + "{0:N0}" -f ((($Total - $Current) / $Total) * 100) + "%") -PercentComplete ((($Total - $Current) / $Total) * 100) -ErrorAction SilentlyContinue
+
 	$Name = $DomainAdminMember.Name
 	$Type = $DomainAdminMember.ObjectClass
 	$Enabled = ($AllUsers | Where-Object { $_.Name -eq $Name }).Enabled
@@ -344,9 +381,13 @@ foreach ($DomainAdminMember in $DomainAdminMembers)
 #Get Enterprise Admins
 $EnterpriseAdminsMembers = Get-ADGroupMember "Enterprise Admins"
 
+$Total = $EnterpriseAdminsMembers.Count
+
 foreach ($EnterpriseAdminsMember in $EnterpriseAdminsMembers)
 {
 	
+    Write-Progress -Activity "Processing $($Current++) of $($Total) Enterprise Admins..." -Status ("Percent Complete:" + "{0:N0}" -f ((($Total - $Current) / $Total) * 100) + "%") -PercentComplete ((($Total - $Current) / $Total) * 100) -ErrorAction SilentlyContinue
+
 	$Name = $EnterpriseAdminsMember.Name
 	$Type = $EnterpriseAdminsMember.ObjectClass
 	$Enabled = ($AllUsers | Where-Object { $_.Name -eq $Name }).Enabled
@@ -361,12 +402,16 @@ foreach ($EnterpriseAdminsMember in $EnterpriseAdminsMembers)
 	$EnterpriseAdminTable.Add($obj)
 }
 
-$DefaultComputersOU = (Get-ADDomain).computerscontainer
-$DefaultComputers = Get-ADComputer -Filter * -Properties * -SearchBase "$DefaultComputersOU"
+$DefaultComputersOU = (Get-ADDomain).ComputersContainer
+$DefaultComputers = $Computers | Where-Object { $_.DistinguishedName -like "*$($DefaultComputersOU)"}
+
+$Total = $DefaultComputers.Count
 
 foreach ($DefaultComputer in $DefaultComputers)
 {
 	
+    Write-Progress -Activity "Processing $($Current++) of $($Total) Default Computers..." -Status ("Percent Complete:" + "{0:N0}" -f ((($Total - $Current) / $Total) * 100) + "%") -PercentComplete ((($Total - $Current) / $Total) * 100) -ErrorAction SilentlyContinue
+
 	$obj = [PSCustomObject]@{
 		
 		'Name' = $DefaultComputer.Name
@@ -383,9 +428,13 @@ foreach ($DefaultComputer in $DefaultComputers)
 $DefaultUsersOU = (Get-ADDomain).UsersContainer
 $DefaultUsers = $Allusers | Where-Object { $_.DistinguishedName -like "*$($DefaultUsersOU)" } | Select-Object Name, UserPrincipalName, Enabled, ProtectedFromAccidentalDeletion, EmailAddress, @{ Name = 'lastlogon'; Expression = { LastLogonConvert $_.lastlogon } }, DistinguishedName
 
+$Total = $DefaultUsers.Count
+
 foreach ($DefaultUser in $DefaultUsers)
 {
 	
+    Write-Progress -Activity "Processing $($Current++) of $($Total) Default Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($Total - $Current) / $Total) * 100) + "%") -PercentComplete ((($Total - $Current) / $Total) * 100) -ErrorAction SilentlyContinue
+
 	$obj = [PSCustomObject]@{
 		
 		'Name' = $DefaultUser.Name
@@ -411,9 +460,13 @@ if (($DefaultUsersinDefaultOUTable).Count -eq 0)
 #Expiring Accounts
 $LooseUsers = Search-ADAccount -AccountExpiring -UsersOnly
 
+$Total = $LooseUsers.Count
+
 foreach ($LooseUser in $LooseUsers)
 {
 	
+    Write-Progress -Activity "Processing $($Current++) of $($Total) Loose Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($Total - $Current) / $Total) * 100) + "%") -PercentComplete ((($Total - $Current) / $Total) * 100) -ErrorAction SilentlyContinue
+
 	$NameLoose = $LooseUser.Name
 	$UPNLoose = $LooseUser.UserPrincipalName
 	$ExpirationDate = $LooseUser.AccountExpirationDate
@@ -442,9 +495,13 @@ if (($ExpiringAccountsTable).Count -eq 0)
 #Security Logs
 $SecurityLogs = Get-EventLog -Newest 7 -LogName "Security" | Where-Object { $_.Message -like "*An account*" }
 
+$Total = $SecurityLogs.Count
+
 foreach ($SecurityLog in $SecurityLogs)
 {
 	
+    Write-Progress -Activity "Processing $($Current++) of $($Total) Security Logs..." -Status ("Percent Complete:" + "{0:N0}" -f ((($Total - $Current) / $Total) * 100) + "%") -PercentComplete ((($Total - $Current) / $Total) * 100) -ErrorAction SilentlyContinue
+
 	$TimeGenerated = $SecurityLog.TimeGenerated
 	$EntryType = $SecurityLog.EntryType
 	$Recipient = $SecurityLog.Message
@@ -501,9 +558,13 @@ $Groupswithnomembership = 0
 $GroupsProtected = 0
 $GroupsNotProtected = 0
 
+$Total = $Groups.Count
+
 foreach ($Group in $Groups)
 {
 	
+    Write-Progress -Activity "Processing $($Current++) of $($Total) Security Groups..." -Status ("Percent Complete:" + "{0:N0}" -f ((($Total - $Current) / $Total) * 100) + "%") -PercentComplete ((($Total - $Current) / $Total) * 100) -ErrorAction SilentlyContinue
+
 	$DefaultADGroup = 'False'
 	$Type = New-Object 'System.Collections.Generic.List[System.Object]'
 	$Gemail = (Get-ADGroup $Group -Properties mail).mail
@@ -727,9 +788,13 @@ $OUwithnoLink = 0
 $OUProtected = 0
 $OUNotProtected = 0
 
+$Total = $OUs.Count
+
 foreach ($OU in $OUs)
 {
 	
+    Write-Progress -Activity "Processing $($Current++) of $($Total) Organizational Units..." -Status ("Percent Complete:" + "{0:N0}" -f ((($Total - $Current) / $Total) * 100) + "%") -PercentComplete ((($Total - $Current) / $Total) * 100) -ErrorAction SilentlyContinue
+
 	$LinkedGPOs = New-Object 'System.Collections.Generic.List[System.Object]'
 	
 	if (($OU.linkedgrouppolicyobjects).length -lt 1)
@@ -842,8 +907,12 @@ $UsersWIthPasswordsExpiringInUnderAWeek = 0
 $UsersNotLoggedInOver30Days = 0
 $AccountsExpiringSoon = 0
 
+$Total = $Users.Count
+
 foreach ($User in $AllUsers)
 {
+
+    Write-Progress -Activity "Processing $($Current++) of $($Total) Users..." -Status ("Percent Complete:" + "{0:N0}" -f ((($Total - $Current) / $Total) * 100) + "%") -PercentComplete ((($Total - $Current) / $Total) * 100) -ErrorAction SilentlyContinue
 	
 	$AttVar = $User | Select-Object Enabled, PasswordExpired, PasswordLastSet, PasswordNeverExpires, PasswordNotRequired, Name, SamAccountName, EmailAddress, AccountExpirationDate, @{ Name = 'lastlogon'; Expression = { LastLogonConvert $_.lastlogon } }, DistinguishedName
 	$maxPasswordAge = (Get-ADDefaultDomainPasswordPolicy).MaxPasswordAge
@@ -1089,8 +1158,12 @@ Write-Host "Working on Group Policy Report..." -ForegroundColor Green
 
 $GPOTable = New-Object 'System.Collections.Generic.List[System.Object]'
 
+$Total = $GPOs.Count
+
 foreach ($GPO in $GPOs)
 {
+
+    Write-Progress -Activity "Processing $($Current++) of $($Total) Group Policies..." -Status ("Percent Complete:" + "{0:N0}" -f ((($Total - $Current) / $Total) * 100) + "%") -PercentComplete ((($Total - $Current) / $Total) * 100) -ErrorAction SilentlyContinue
 	
 	$obj = [PSCustomObject]@{
 		
@@ -1103,6 +1176,7 @@ foreach ($GPO in $GPOs)
 	
 	$GPOTable.Add($obj)
 }
+
 Write-Host "Done!" -ForegroundColor White
 <###########################
 
@@ -1111,7 +1185,6 @@ Write-Host "Done!" -ForegroundColor White
 ############################>
 Write-Host "Working on Computers Report..." -ForegroundColor Green
 
-$Computers = Get-ADComputer -Filter * -Properties *
 $ComputersProtected = 0
 $ComputersNotProtected = 0
 $ComputerEnabled = 0
@@ -1125,8 +1198,12 @@ $Windows8 = 0
 $Windows7 = 0
 $Server2012R2 = 0
 
+$Total = $Computers.Count
+
 foreach ($Computer in $Computers)
 {
+
+    Write-Progress -Activity "Processing $($Current++) of $($Total) Computers..." -Status ("Percent Complete:" + "{0:N0}" -f ((($Total - $Current) / $Total) * 100) + "%") -PercentComplete ((($Total - $Current) / $Total) * 100) -ErrorAction SilentlyContinue
 	
 	if ($Computer.ProtectedFromAccidentalDeletion -eq $True)
 	{
@@ -1710,89 +1787,89 @@ $FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[3] -TabHeading ("Re
 
 $FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Users Overivew"))
 $FinalReport.Add($(Get-HTMLContentTable $TOPUserTable -HideFooter))
-		$FinalReport.Add($(Get-HTMLContentClose))
+$FinalReport.Add($(Get-HTMLContentClose))
 		
-		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Active Directory Users"))
-		$FinalReport.Add($(Get-HTMLContentDataTable $UserTable -HideFooter))
-		$FinalReport.Add($(Get-HTMLContentClose))
+$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Active Directory Users"))
+$FinalReport.Add($(Get-HTMLContentDataTable $UserTable -HideFooter))
+$FinalReport.Add($(Get-HTMLContentClose))
 		
-		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Expiring Items"))
-		$FinalReport.Add($(Get-HTMLColumn1of2))
-		$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users with Passwords Expiring in less than $DaysUntilPWExpireINT days"))
-		$FinalReport.Add($(Get-HTMLContentDataTable $PasswordExpireSoonTable -HideFooter))
-		$FinalReport.Add($(Get-HTMLContentClose))
-		$FinalReport.Add($(Get-HTMLColumnClose))
-		$FinalReport.Add($(Get-HTMLColumn2of2))
-		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText 'Accounts Expiring Soon'))
-		$FinalReport.Add($(Get-HTMLContentDataTable $ExpiringAccountsTable -HideFooter))
-		$FinalReport.Add($(Get-HTMLContentClose))
-		$FinalReport.Add($(Get-HTMLColumnClose))
-		$FinalReport.Add($(Get-HTMLContentClose))
+$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Expiring Items"))
+$FinalReport.Add($(Get-HTMLColumn1of2))
+$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users with Passwords Expiring in less than $DaysUntilPWExpireINT days"))
+$FinalReport.Add($(Get-HTMLContentDataTable $PasswordExpireSoonTable -HideFooter))
+$FinalReport.Add($(Get-HTMLContentClose))
+$FinalReport.Add($(Get-HTMLColumnClose))
+$FinalReport.Add($(Get-HTMLColumn2of2))
+$FinalReport.Add($(Get-HTMLContentOpen -HeaderText 'Accounts Expiring Soon'))
+$FinalReport.Add($(Get-HTMLContentDataTable $ExpiringAccountsTable -HideFooter))
+$FinalReport.Add($(Get-HTMLContentClose))
+$FinalReport.Add($(Get-HTMLColumnClose))
+$FinalReport.Add($(Get-HTMLContentClose))
 		
-		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Accounts"))
-		$FinalReport.Add($(Get-HTMLColumn1of2))
-		$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days"))
-		$FinalReport.Add($(Get-HTMLContentDataTable $userphaventloggedonrecentlytable -HideFooter))
-		$FinalReport.Add($(Get-HTMLContentClose))
-		$FinalReport.Add($(Get-HTMLColumnClose))
-		$FinalReport.Add($(Get-HTMLColumn2of2))
+$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Accounts"))
+$FinalReport.Add($(Get-HTMLColumn1of2))
+$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days"))
+$FinalReport.Add($(Get-HTMLContentDataTable $userphaventloggedonrecentlytable -HideFooter))
+$FinalReport.Add($(Get-HTMLContentClose))
+$FinalReport.Add($(Get-HTMLColumnClose))
+$FinalReport.Add($(Get-HTMLColumn2of2))
 		
-		$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Accounts Created in $UserCreatedDays Days or Less"))
-		$FinalReport.Add($(Get-HTMLContentDataTable $NewCreatedUsersTable -HideFooter))
-		$FinalReport.Add($(Get-HTMLContentClose))
-		$FinalReport.Add($(Get-HTMLColumnClose))
-		$FinalReport.Add($(Get-HTMLContentClose))
+$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Accounts Created in $UserCreatedDays Days or Less"))
+$FinalReport.Add($(Get-HTMLContentDataTable $NewCreatedUsersTable -HideFooter))
+$FinalReport.Add($(Get-HTMLContentClose))
+$FinalReport.Add($(Get-HTMLColumnClose))
+$FinalReport.Add($(Get-HTMLContentClose))
 		
-		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Users Charts"))
-		$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 3))
-		$FinalReport.Add($(Get-HTMLPieChart -ChartObject $EnabledDisabledUsersPieObject -DataSet $EnabledDisabledUsersTable))
-		$FinalReport.Add($(Get-HTMLColumnClose))
-		$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 3))
-		$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PWExpiresUsersTable -DataSet $PasswordExpirationTable))
-		$FinalReport.Add($(Get-HTMLColumnClose))
-		$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 3 -ColumnCount 3))
-		$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectProtectedUsers -DataSet $ProtectedUsersTable))
-		$FinalReport.Add($(Get-HTMLColumnClose))
-		$FinalReport.Add($(Get-HTMLContentClose))
-		$FinalReport.Add($(Get-HTMLTabContentClose))
+$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Users Charts"))
+$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 3))
+$FinalReport.Add($(Get-HTMLPieChart -ChartObject $EnabledDisabledUsersPieObject -DataSet $EnabledDisabledUsersTable))
+$FinalReport.Add($(Get-HTMLColumnClose))
+$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 3))
+$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PWExpiresUsersTable -DataSet $PasswordExpirationTable))
+$FinalReport.Add($(Get-HTMLColumnClose))
+$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 3 -ColumnCount 3))
+$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectProtectedUsers -DataSet $ProtectedUsersTable))
+$FinalReport.Add($(Get-HTMLColumnClose))
+$FinalReport.Add($(Get-HTMLContentClose))
+$FinalReport.Add($(Get-HTMLTabContentClose))
 		
-		#GPO Report
-		$FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[4] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
-		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Group Policies"))
-		$FinalReport.Add($(Get-HTMLContentDataTable $GPOTable -HideFooter))
-		$FinalReport.Add($(Get-HTMLContentClose))
-		$FinalReport.Add($(Get-HTMLTabContentClose))
+#GPO Report
+$FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[4] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
+$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Group Policies"))
+$FinalReport.Add($(Get-HTMLContentDataTable $GPOTable -HideFooter))
+$FinalReport.Add($(Get-HTMLContentClose))
+$FinalReport.Add($(Get-HTMLTabContentClose))
 		
-		#Computers Report
-		$FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[5] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
+#Computers Report
+$FinalReport.Add($(Get-HTMLTabContentopen -TabName $tabarray[5] -TabHeading ("Report: " + (Get-Date -Format MM-dd-yyyy))))
 		
-		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers Overivew"))
-		$FinalReport.Add($(Get-HTMLContentTable $TOPComputersTable -HideFooter))
-		$FinalReport.Add($(Get-HTMLContentClose))
+$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers Overivew"))
+$FinalReport.Add($(Get-HTMLContentTable $TOPComputersTable -HideFooter))
+$FinalReport.Add($(Get-HTMLContentClose))
 		
-		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers"))
-		$FinalReport.Add($(Get-HTMLContentDataTable $ComputersTable -HideFooter))
-		$FinalReport.Add($(Get-HTMLContentClose))
+$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers"))
+$FinalReport.Add($(Get-HTMLContentDataTable $ComputersTable -HideFooter))
+$FinalReport.Add($(Get-HTMLContentClose))
 		
-		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers Charts"))
-		$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 2))
-		$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectComputersProtected -DataSet $ComputerProtectedTable))
-		$FinalReport.Add($(Get-HTMLColumnClose))
-		$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 2))
-		$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectComputersEnabled -DataSet $ComputersEnabledTable))
-		$FinalReport.Add($(Get-HTMLColumnClose))
-		$FinalReport.Add($(Get-HTMLContentclose))
+$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers Charts"))
+$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 1 -ColumnCount 2))
+$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectComputersProtected -DataSet $ComputerProtectedTable))
+$FinalReport.Add($(Get-HTMLColumnClose))
+$FinalReport.Add($(Get-HTMLColumnOpen -ColumnNumber 2 -ColumnCount 2))
+$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectComputersEnabled -DataSet $ComputersEnabledTable))
+$FinalReport.Add($(Get-HTMLColumnClose))
+$FinalReport.Add($(Get-HTMLContentclose))
 		
-		$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers Operating System Breakdown"))
-		$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectComputerObjOS -DataSet $GraphComputerOS))
-		$FinalReport.Add($(Get-HTMLContentclose))
+$FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Computers Operating System Breakdown"))
+$FinalReport.Add($(Get-HTMLPieChart -ChartObject $PieObjectComputerObjOS -DataSet $GraphComputerOS))
+$FinalReport.Add($(Get-HTMLContentclose))
 		
-		$FinalReport.Add($(Get-HTMLTabContentClose))
-		$FinalReport.Add($(Get-HTMLClosePage))
+$FinalReport.Add($(Get-HTMLTabContentClose))
+$FinalReport.Add($(Get-HTMLClosePage))
 		
-		$Day = (Get-Date).Day
-		$Month = (Get-Date).Month
-		$Year = (Get-Date).Year
-		$ReportName = ("$Day - $Month - $Year - AD Report")
+$Day = (Get-Date).Day
+$Month = (Get-Date).Month
+$Year = (Get-Date).Year
+$ReportName = ("$Day - $Month - $Year - AD Report")
 		
-		Save-HTMLReport -ReportContent $FinalReport -ShowReport -ReportName $ReportName -ReportPath $ReportSavePath
+Save-HTMLReport -ReportContent $FinalReport -ShowReport -ReportName $ReportName -ReportPath $ReportSavePath
