@@ -889,7 +889,7 @@ foreach ($User in $AllUsers)
 	#Get users that haven't logged on in X amount of days, var is set at start of script
 	if (($User.Enabled -eq $True) -and ($User.LastLogonDate -lt (Get-Date).AddDays(- $Days)) -and ($User.LastLogonDate -ne $NULL))
 	{
-		
+		$userphaventloggedonrecentlytable = New-Object 'System.Collections.Generic.List[System.Object]'
 		$obj = [PSCustomObject]@{
 			
 			'Name' = $User.Name
