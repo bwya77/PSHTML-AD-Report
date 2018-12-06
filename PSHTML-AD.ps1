@@ -47,6 +47,8 @@
 			  Bradley Wyatt 12/5/2018
 #>
 
+#Requires -Version 5.1
+#Requires -Module ActiveDirectory
 param (
 	
 	#Company logo that will be displayed on the left, can be URL or UNC
