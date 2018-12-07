@@ -308,7 +308,7 @@ $CompanyInfoTable.Add($obj)
 if (($CompanyInfoTable).Count -eq 0)
 {
 	
-	$Obj= [PSCustomObject]@{
+	$Obj = [PSCustomObject]@{
 		
 		Information = 'Information: Could not get items for table'
 	}
@@ -1057,6 +1057,16 @@ foreach ($User in $AllUsers)
 		$PasswordExpireSoonTable.Add($obj)
 	}
 }
+if (($PasswordExpireSoonTable).Count -eq 0)
+{
+	
+	$Obj = [PSCustomObject]@{
+		
+		Information = 'Information: No users were found to have passwords expiring soon'
+	}
+	$PasswordExpireSoonTable.Add($obj)
+}
+
 
 if (($usertable).Count -eq 0)
 {
