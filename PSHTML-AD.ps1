@@ -1119,7 +1119,7 @@ $WindowsRegex = "(Windows (Server )?(\d+|XP)?( R2)?).*"
 $OsVersions = $Computers | Select-Object OperatingSystem -unique | ForEach-Object {
 	if ($_.OperatingSystem -match $WindowsRegex ){ 
 		return $matches[1]
-	} else {
+	} elseif ($_.OperatingSystem -ne $null) {
 		return $_.OperatingSystem
 	}
 } | Select-Object -unique | Sort-Object
