@@ -1120,7 +1120,7 @@ $OsVersions = $Computers | Select-Object OperatingSystem -unique | ForEach-Objec
 	if ($_.OperatingSystem -match $WindowsRegex ){ 
 		return $matches[1]
 	} else {
-		#return $_.OperatingSystem
+		return $_.OperatingSystem
 	}
 } | Select-Object -unique | Sort-Object
 
