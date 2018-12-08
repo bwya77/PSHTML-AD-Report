@@ -377,7 +377,7 @@ if (($DomainAdminTable).Count -eq 0)
 
 
 #Get Enterprise Admins
-$EnterpriseAdminsMembers = Get-ADGroupMember "Enterprise Admins"
+$EnterpriseAdminsMembers = Get-ADGroupMember "Enterprise Admins" -Server $SchemaMaster
 
 foreach ($EnterpriseAdminsMember in $EnterpriseAdminsMembers)
 {
