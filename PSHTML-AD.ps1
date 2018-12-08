@@ -1212,14 +1212,23 @@ $ComputersProtected = 0
 $ComputersNotProtected = 0
 $ComputerEnabled = 0
 $ComputerDisabled = 0
-$Server2016 = 0
-$Server2012 = 0
-$Server2012R2 = 0
-$Server2008R2 = 0
-$Windows10 = 0
-$Windows8 = 0
-$Windows7 = 0
-$Server2012R2 = 0
+#Only search for versions of windows that exist in the Environment
+$WindowsRegex = "(Windows (Server )?(\d+|XP)?( R2)?).*"
+$OsVersions = $Computers | Select-Object OperatingSystem -unique | ForEach-Object {
+	if ($_.OperatingSystem -match $WindowsRegex ){ 
+		return $matches[1]
+	} elseif ($_.OperatingSystem -ne $null) {
+		return $_.OperatingSystem
+	}
+} | Select-Object -unique | Sort-Object
+
+$OsObj = [PSCustomObject]@{}
+
+$OsVersions | ForEach-Object {
+
+	$OsObj | Add-Member -Name $_ -Value 0 -Type NoteProperty
+
+}
 
 foreach ($Computer in $Computers)
 {
@@ -1260,47 +1269,11 @@ foreach ($Computer in $Computers)
 	
 	$ComputersTable.Add($obj)
 	
-	if ($Computer.OperatingSystem -like "*Server 2016*")
+	if ($Computer.OperatingSystem -match $WindowsRegex)
 	{
-		
-		$Server2016++
+		$OsObj."$($matches[1])"++
 	}
-	
-	elseif ($Computer.OperatingSystem -like "*Server 2012 R2*")
-	{
-		
-		$Server2012R2++
-	}
-	
-	elseif ($Computer.OperatingSystem -like "*Server 2012*")
-	{
-		
-		$Server2012++
-	}
-	
-	elseif ($Computer.OperatingSystem -like "*Server 2008 R2*")
-	{
-		
-		$Server2008R2++
-	}
-	
-	elseif ($Computer.OperatingSystem -like "*Windows 10*")
-	{
-		
-		$Windows10++
-	}
-	
-	elseif ($Computer.OperatingSystem -like "*Windows 8*")
-	{
-		
-		$Windows8++
-	}
-	
-	elseif ($Computer.OperatingSystem -like "*Windows 7*")
-	{
-		
-		$Windows7++
-	}
+
 }
 
 if (($ComputersTable).Count -eq 0)
@@ -1313,77 +1286,16 @@ if (($ComputersTable).Count -eq 0)
 	$ComputersTable.Add($obj)
 }
 
-#Data for TOP Computers data table
-$objULic = [PSCustomObject]@{
-	
-	'Total Computers' = $Computers.Count
-	"Server 2016"	  = $Server2016
-	"Server 2012 R2"  = $Server2012R2
-	"Server 2012"	  = $Server2012
-	"Server 2008 R2"  = $Server2008R2
-	"Windows 10"	  = $Windows10
-	"Windows 8"	      = $Windows8
-	"Windows 7"	      = $Windows7
-}
-
-$TOPComputersTable.Add($objULic)
-
 #Pie chart breaking down OS for computer obj
-$objULic = [PSCustomObject]@{
-	
-	'Name'  = "Server 2016"
-	"Count" = $Server2016
+$OsObj.PSObject.Properties  | ForEach-Object {
+	$GraphComputerOS.Add([PSCustomObject]@{'Name'  = $_.Name;"Count" =$_.Value})
 }
 
-$GraphComputerOS.Add($objULic)
+#Data for TOP Computers data table
+$OsObj | Add-Member -Name 'Total Computers' -Value $Computers.Count -Type NoteProperty
 
-$objULic = [PSCustomObject]@{
-	
-	'Name'  = "Server 2012 R2"
-	"Count" = $Server2012R2
-}
+$TOPComputersTable.Add($OsObj)
 
-$GraphComputerOS.Add($objULic)
-
-$objULic = [PSCustomObject]@{
-	
-	'Name'  = "Server 2012"
-	"Count" = $Server2012
-}
-
-$GraphComputerOS.Add($objULic)
-
-$objULic = [PSCustomObject]@{
-	
-	'Name'  = "Server 2008 R2"
-	"Count" = $Server2008R2
-}
-
-$GraphComputerOS.Add($objULic)
-
-$objULic = [PSCustomObject]@{
-	
-	'Name'  = "Windows 10"
-	"Count" = $Windows10
-}
-
-$GraphComputerOS.Add($objULic)
-
-$objULic = [PSCustomObject]@{
-	
-	'Name'  = "Windows 8"
-	"Count" = $Windows8
-}
-
-$GraphComputerOS.Add($objULic)
-
-$objULic = [PSCustomObject]@{
-	
-	'Name'  = "Windows 7"
-	"Count" = $Windows7
-}
-
-$GraphComputerOS.Add($objULic)
 
 #Data for protected Computers pie graph
 $objULic = [PSCustomObject]@{
