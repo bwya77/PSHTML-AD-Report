@@ -21,9 +21,9 @@
     -ReportTitle "Active Directory Report"
 
 .PARAMETER Days
-    Users that have not logged in within [X] amount of days.
+    Users that have not logged in [X] amount of days or more.
 
-    -Days "1"
+    -Days "30"
 
 .PARAMETER UserCreatedDays
     Users that have been created within [X] amount of days.
@@ -41,6 +41,7 @@
     -ADModNumber "3"
 
 .NOTES
+    Version: 1.0.3
     Author: Bradley Wyatt
     Date: 12/4/2018
     Modified: JBear 12/5/2018
@@ -66,8 +67,8 @@ param (
 	[String]$ReportSavePath = "C:\Automation\",
 	#Find users that have not logged in X Amount of days, this sets the days
 
-	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have not logged in within [X] amount of days; Default: 1")]
-	$Days = 1,
+	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have not logged on in more than [X] days. amount of days; Default: 30")]
+	$Days = 30,
 	#Get users who have been created in X amount of days and less
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have been created within [X] amount of days; Default: 7")]
@@ -908,6 +909,9 @@ $UsersWIthPasswordsExpiringInUnderAWeek = 0
 $UsersNotLoggedInOver30Days = 0
 $AccountsExpiringSoon = 0
 
+
+#Get users that haven't logged on in X amount of days, var is set at start of script
+$userphaventloggedonrecentlytable = New-Object 'System.Collections.Generic.List[System.Object]'
 foreach ($User in $AllUsers)
 {
 	
@@ -952,8 +956,7 @@ foreach ($User in $AllUsers)
 		$daystoexpire = "N/A"
 	}
 	
-	#Get users that haven't logged on in X amount of days, var is set at start of script
-	if (($User.Enabled -eq $True) -and ($User.LastLogonDate -lt (Get-Date).AddDays(- $Days)) -and ($User.LastLogonDate -ne $NULL))
+	if (($User.Enabled -eq $True) -and ($AttVar.LastLogon -lt ((Get-Date).AddDays(- $Days))) -and ($User.LastLogon -ne $NULL))
 	{
 		
 		$obj = [PSCustomObject]@{
@@ -968,15 +971,6 @@ foreach ($User in $AllUsers)
 		}
 		
 		$userphaventloggedonrecentlytable.Add($obj)
-	}
-	
-	if (($userphaventloggedonrecentlytable).Count -eq 0)
-	{
-		
-		$userphaventloggedonrecentlytable = [PSCustomObject]@{
-			
-			Information = "Information: No Users were found to have not logged on in $Days days"
-		}
 	}
 	
 	#Items for protected vs non protected users
@@ -1057,6 +1051,13 @@ foreach ($User in $AllUsers)
 		$PasswordExpireSoonTable.Add($obj)
 	}
 }
+if (($userphaventloggedonrecentlytable).Count -eq 0)
+{
+	$userphaventloggedonrecentlytable = [PSCustomObject]@{
+		
+		Information = "Information: No Users were found to have not logged on in $Days days or more"
+	}
+}
 if (($PasswordExpireSoonTable).Count -eq 0)
 {
 	
@@ -1128,16 +1129,25 @@ $objULic = [PSCustomObject]@{
 }
 
 $ProtectedUsersTable.Add($objULic)
-
+if ($null -ne (($userphaventloggedonrecentlytable).Information))
+{
+	$UHLONXD = "0"
+	
+}
+Else
+{
+	$UHLONXD = $userphaventloggedonrecentlytable.Count
+	
+}
 #TOP User table
-If (($ExpiringAccountsTable).Count -gt 0)
+If ($null -eq (($ExpiringAccountsTable).Information))
 {
 	
 	$objULic = [PSCustomObject]@{
 		'Total Users' = $AllUsers.Count
 		"Users with Passwords Expiring in less than $DaysUntilPWExpireINT days" = $PasswordExpireSoonTable.Count
 		'Expiring Accounts' = $ExpiringAccountsTable.Count
-		"Users Haven't Logged on in $Days Days" = $userphaventloggedonrecentlytable.Count
+		"Users Haven't Logged on in $Days Days or more" = $UHLONXD
 	}
 	
 	$TOPUserTable.Add($objULic)
@@ -1151,7 +1161,7 @@ Else
 		'Total Users' = $AllUsers.Count
 		"Users with Passwords Expiring in less than $DaysUntilPWExpireINT days" = $PasswordExpireSoonTable.Count
 		'Expiring Accounts' = "0"
-		"Users Haven't Logged on in $Days Days" = $userphaventloggedonrecentlytable.Count
+		"Users Haven't Logged on in $Days Days or more" = $UHLONXD
 	}
 	$TOPUserTable.Add($objULic)
 }
@@ -1718,7 +1728,7 @@ $FinalReport.Add($(Get-HTMLContentClose))
 
 $FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Accounts"))
 $FinalReport.Add($(Get-HTMLColumn1of2))
-$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days"))
+$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days or more"))
 $FinalReport.Add($(Get-HTMLContentDataTable $userphaventloggedonrecentlytable -HideFooter))
 $FinalReport.Add($(Get-HTMLContentClose))
 $FinalReport.Add($(Get-HTMLColumnClose))
@@ -1818,7 +1828,7 @@ $FinalReport.Add($(Get-HTMLContentClose))
 
 $FinalReport.Add($(Get-HTMLContentOpen -HeaderText "Accounts"))
 $FinalReport.Add($(Get-HTMLColumn1of2))
-$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days"))
+$FinalReport.Add($(Get-HTMLContentOpen -BackgroundShade 1 -HeaderText "Users Haven't Logged on in $Days Days or more"))
 $FinalReport.Add($(Get-HTMLContentDataTable $userphaventloggedonrecentlytable -HideFooter))
 $FinalReport.Add($(Get-HTMLContentClose))
 $FinalReport.Add($(Get-HTMLColumnClose))
