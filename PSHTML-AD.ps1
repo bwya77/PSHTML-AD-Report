@@ -50,47 +50,56 @@
     michaelawilliams28 5/22/2020
 #>
 
+
 param (
+	[Parameter(ValueFromPipeline = $true)]
+	$script:loggingDate = (get-date -Format MM-dd-yyyy-hh:mm:ss),
+	
+	[Parameter(ValueFromPipeline = $true)]
+	$script:logDate = (Get-Date -Format MM-dd-yyyy),
+	
+	[Parameter(ValueFromPipeline = $true)]
+	$script:currentdir = (Get-Location),
+	
+	[Parameter(ValueFromPipeline = $true)]
+	$script:steps = 25,
 	
 	#Company logo that will be displayed on the left, can be URL or UNC
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter URL or UNC path to Company Logo")]
-	[String]$CompanyLogo = "",
+	[String]$script:CompanyLogo = "",
 	#Logo that will be on the right side, UNC or URL
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter URL or UNC path for Side Logo")]
-	[String]$RightLogo = "https://www.psmpartners.com/wp-content/uploads/2017/10/porcaro-stolarek-mete.png",
+	[String]$script:RightLogo = "https://www.psmpartners.com/wp-content/uploads/2017/10/porcaro-stolarek-mete.png",
 	#Title of generated report
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired title for report")]
-	[String]$ReportTitle = "Active Directory Report",
+	[String]$script:ReportTitle = "Active Directory Report",
 	#Location the report will be saved to
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter desired directory path to save; Default: C:\Automation\")]
-	[String]$ReportSavePath = "$script:currentdir\report\",
+	[String]$script:ReportSavePath = "$script:currentdir\report\",
 	#Find users that have not logged in X Amount of days, this sets the days
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have not logged on in more than [X] days. amount of days; Default: 30")]
-	$Days = 30,
+	$script:Days = 30,
 	#Get users who have been created in X amount of days and less
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users that have been created within [X] amount of days; Default: 7")]
-	$UserCreatedDays = 7,
+	$script:UserCreatedDays = 7,
 	#Get users whos passwords expire in less than X amount of days
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Users password expires within [X] amount of days; Default: 7")]
-	$DaysUntilPWExpireINT = 7,
+	$script:DaysUntilPWExpireINT = 7,
 	#Get AD Objects that have been modified in X days and newer
 
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "AD Objects that have been modified within [X] amount of days; Default: 3")]
-	$ADModNumber = 3
-    
+	$script:ADModNumber = 3
+	
 	#CSS template located C:\Program Files\WindowsPowerShell\Modules\ReportHTML\1.4.1.1\
 	#Default template is orange and named "Sample"
 )
-$script:loggingDate = get-date -Format MM-dd-yyyy-hh:mm:ss
-$script:logDate = Get-Date -Format MM-dd-yyyy
-$script:currentdir = Get-Location
-$script:steps = 25
+
 
 #Check for ReportHTML Module
 Function Test-htmlModule {
