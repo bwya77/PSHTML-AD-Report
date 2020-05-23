@@ -41,7 +41,7 @@
     -ADModNumber "3"
 
 .NOTES
-    Version: 1.0.3
+    Version: 1.0.4
     Author: Bradley Wyatt
     Date: 12/4/2018
     Modified: JBear 12/5/2018
