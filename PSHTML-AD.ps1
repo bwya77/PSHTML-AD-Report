@@ -1061,11 +1061,14 @@ Function Get-Adcomputers {
 		else {
 			$ComputerDisabled++
 		}
+		$computerlastlogin = $Computer.lastLogonTimestamp
+		$computerlastlogin = Set-FileTime $computerlastlogin
 		$computerobjects = [PSCustomObject]@{
 			'Name'                  = $Computer.Name
 			'Enabled'               = $Computer.Enabled
 			'Operating System'      = $Computer.OperatingSystem
 			'Modified Date'         = $Computer.Modified
+			'Last Login'            = $computerlastlogin
 			'Password Last Set'     = $Computer.PasswordLastSet
 			'Protect from Deletion' = $Computer.ProtectedFromAccidentalDeletion
 		}
