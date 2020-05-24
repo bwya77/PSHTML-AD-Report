@@ -499,7 +499,8 @@ Function Get-ADUsers {
 			foreach ($DefaultUser in $DefaultUsers) {
 				# $DefaultUserlogon = $DefaultUser | Set-FileTime $_.lastlogon
 				New-LogWrite "[$loggingDate]  $DefaultUser "
-				$DefaultUserlogon = $DefaultUser.Lastlogon | Set-FileTime
+				$DefaultUserlogon = $DefaultUser.Lastlogon 
+				$DefaultUserlogon = Set-FileTime $DefaultUserlogon
 				New-LogWrite "[$loggingDate]  $DefaultUserlogon "
 				$aduserobject = [PSCustomObject]@{
 					'Name'                    = $DefaultUser.Name
