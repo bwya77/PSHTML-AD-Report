@@ -41,7 +41,7 @@
     -ADModNumber "3"
 
 .NOTES
-    Version: 1.0.4
+    Version: 1.0.3
     Author: Bradley Wyatt
     Date: 12/4/2018
     Modified: JBear 12/5/2018
@@ -63,7 +63,6 @@ param (
 	
 	[Parameter(ValueFromPipeline = $true)]
 	$script:steps = 25,
-	
 	#Company logo that will be displayed on the left, can be URL or UNC
 	[Parameter(ValueFromPipeline = $true, HelpMessage = "Enter URL or UNC path to Company Logo")]
 	[String]$script:CompanyLogo = "",
@@ -179,8 +178,9 @@ Function Set-Header {
 # Convert object time
 Function Set-FileTime ($FileTime) {
 	New-LogWrite  "[$loggingdate] Function Set-FileTime"
+	New-LogWrite  "[$loggingdate] `$FileTime $FileTime"
 	$Date = [DateTime]::FromFileTime($FileTime)
-	if (!$date ) {
+	if ((!$date ) -or $Date -lt (Get-Date '1/1/1900') -or $date -eq 0) {
 		'Never'
 	}
 	else {
@@ -283,7 +283,7 @@ Function Get-CreateObjects {
 	$script:GraphComputerOS = New-Object 'System.Collections.Generic.List[System.Object]'
 	$script:Type = New-Object 'System.Collections.Generic.List[System.Object]'
 	$script:LinkedGPOs = New-Object 'System.Collections.Generic.List[System.Object]'
-	$script:userphaventloggedonrecentlytable = New-Object 'System.Collections.Generic.List[System.Object]'
+	# $script:userphaventloggedonrecentlytable = New-Object 'System.Collections.Generic.List[System.Object]'
 	$script:GPOTable = New-Object 'System.Collections.Generic.List[System.Object]'
 	$script:recentgpostable = New-Object 'System.Collections.Generic.List[System.Object]'
 
@@ -493,15 +493,20 @@ Function Get-ADUsers {
 	$DefaultUsersOU = (Get-ADDomain).UsersContainer
 	If ($DefaultUsersOU ) {
 		# $DefaultUsers = $Allusers | Where-Object { $_.DistinguishedName -like "*$($DefaultUsersOU)" } | Select-Object Name, UserPrincipalName, Enabled, ProtectedFromAccidentalDeletion, EmailAddress, @{ Name = 'lastlogon'; Expression = { $_.lastlogon } }, DistinguishedName
-		$DefaultUsers = $Allusers | Where-Object { $_.DistinguishedName -like "*$($DefaultUsersOU)" } | Select-Object Name, UserPrincipalName, Enabled, ProtectedFromAccidentalDeletion, EmailAddress, @{ Name = 'lastlogon'; Expression = { Set-FileTime $_.lastlogon } }, DistinguishedName
+		$DefaultUsers = $Allusers | Where-Object { $_.DistinguishedName -like "*$($DefaultUsersOU)" } | Select-Object Name, UserPrincipalName, Enabled, ProtectedFromAccidentalDeletion, EmailAddress, DistinguishedName, LastLogon # @{ Name = 'lastlogon'; Expression = { Set-FileTime $_.lastlogon } }, 
+		#$DefaultUsers = $Allusers | Where-Object { $_.DistinguishedName -like "*$($DefaultUsersOU)" } | Select-Object Name, UserPrincipalName, Enabled, ProtectedFromAccidentalDeletion, EmailAddress, DistinguishedName, lastlogon
 		If ($DefaultUsers) {
 			foreach ($DefaultUser in $DefaultUsers) {
+				# $DefaultUserlogon = $DefaultUser | Set-FileTime $_.lastlogon
+				New-LogWrite "[$loggingDate]  $DefaultUser "
+				$DefaultUserlogon = $DefaultUser.Lastlogon | Set-FileTime
+				New-LogWrite "[$loggingDate]  $DefaultUserlogon "
 				$aduserobject = [PSCustomObject]@{
 					'Name'                    = $DefaultUser.Name
 					'UserPrincipalName'       = $DefaultUser.UserPrincipalName
 					'Enabled'                 = $DefaultUser.Enabled
 					'Protected from Deletion' = $DefaultUser.ProtectedFromAccidentalDeletion
-					'Last Logon'              = $DefaultUser.LastLogon
+					'Last Logon'              = $DefaultUserlogon
 					'Email Address'           = $DefaultUser.EmailAddress
 				}
 				$script:DefaultUsersinDefaultOUTable.Add($aduserobject)
@@ -816,7 +821,10 @@ Function Get-Users {
 	## Get users that haven't logged on in X amount of days, var is set at start of script
 	foreach ($User in $AllUsers) {
 		# $AttVar = $User | Select-Object Enabled, PasswordExpired, PasswordLastSet, PasswordNeverExpires, PasswordNotRequired, Name, SamAccountName, EmailAddress, AccountExpirationDate, @{ Name = 'lastlogon'; Expression = { $_.lastlogon } }, DistinguishedName
-		$AttVar = $User | Select-Object Enabled, PasswordExpired, PasswordLastSet, PasswordNeverExpires, PasswordNotRequired, Name, SamAccountName, EmailAddress, AccountExpirationDate, @{ Name = 'lastlogon'; Expression = { Set-FileTime $_.lastlogon } }, DistinguishedName
+		$AttVar = $User | Select-Object Enabled, PasswordExpired, PasswordLastSet, PasswordNeverExpires, PasswordNotRequired, Name, SamAccountName, EmailAddress, AccountExpirationDate, DistinguishedName, LastLogon
+		$defaultuserlastlogon = $User.lastlogon
+		$defaultuserlastlogon = Set-FileTime $defaultuserlastlogon 
+		New-LogWrite "[$loggingDate] `$defaultuserlastlogon $defaultuserlastlogon "
 		$maxPasswordAge = (Get-ADDefaultDomainPasswordPolicy).MaxPasswordAge.Days
 		if ((($AttVar.PasswordNeverExpires) -eq $False) -and (($AttVar.Enabled) -ne $false)) {
 			# Get Password last set date
@@ -839,14 +847,16 @@ Function Get-Users {
 		else {
 			$daystoexpire = 'N/A'
 		}
-		If ($User -and $AttVar -and $Days ) {
-			if (($User.Enabled -eq $True) -and ($AttVar.LastLogon -lt ((Get-Date).AddDays(- $Days))) -and ($User.LastLogon)) {
+		If (($User.Enabled -eq $True) -and ($defaultuserlastlogon -lt ((Get-Date).AddDays(- $Days))) -and (!$defaultuserlastlogon)) {
+			New-LogWrite "[$loggingDate]  If ($User -and $AttVar -and $Days )"
+			New-LogWrite "[$loggingDate] psobject lastlogon =  $defaultuserlastlogon"
+			if (($User.Enabled -eq $True)) {
 				$objlastlogonobject = [PSCustomObject]@{
 					'Name'                        = $User.Name
 					'UserPrincipalName'           = $User.UserPrincipalName
 					'Enabled'                     = $AttVar.Enabled
 					'Protected from Deletion'     = $User.ProtectedFromAccidentalDeletion
-					'Last Logon'                  = $AttVar.lastlogon
+					'Last Logon'                  = $defaultuserlastlogon
 					'Password Never Expires'      = $AttVar.PasswordNeverExpires
 					'Days Until Password Expires' = $daystoexpire
 				}
@@ -888,7 +898,8 @@ Function Get-Users {
 			'UserPrincipalName'           = $UPN
 			'Enabled'                     = $Enabled
 			'Protected from Deletion'     = $User.ProtectedFromAccidentalDeletion
-			'Last Logon'                  = $LastLogon
+			'Last Logon'                  = $defaultuserlastlogon
+			# 'Last Logon'                  = $LastLogon
 			'Email Address'               = $EmailAddress
 			'Account Expiration'          = $AccountExpiration
 			'Change Password Next Logon'  = $PasswordExpired
