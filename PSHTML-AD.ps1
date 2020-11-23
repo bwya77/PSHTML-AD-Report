@@ -573,10 +573,11 @@ Function Get-Domains {
 	If ($Domains) {
 		ForEach ($Domain  in $Domains) {
 			$domainforest = [PSCustomObject]@{
-				'UPN Suffixes' = $_
-				# 'True'    = $Valid  
+				'UPN Suffixes' = $Domain
+				'True'    = $true  
 			}
 			$script:DomainTable.Add($domainforest)
+			New-LogWrite "[$loggingDate]  `DomainTable $DomainTable"
 		}
 	}
 	New-WriteTime 300
