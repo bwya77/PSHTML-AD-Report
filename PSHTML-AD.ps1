@@ -849,20 +849,25 @@ Function Get-Users {
 		else {
 			$daystoexpire = 'N/A'
 		}
-		If (($User.Enabled -eq $True) -and ($defaultuserlastlogon -lt ((Get-Date).AddDays(- $Days))) -and (!$defaultuserlastlogon)) {
-			New-LogWrite "[$loggingDate]  If ($User -and $AttVar -and $Days )"
-			New-LogWrite "[$loggingDate] psobject lastlogon =  $defaultuserlastlogon"
-			if (($User.Enabled -eq $True)) {
-				$objlastlogonobject = [PSCustomObject]@{
-					'Name'                        = $User.Name
-					'UserPrincipalName'           = $User.UserPrincipalName
-					'Enabled'                     = $AttVar.Enabled
-					'Protected from Deletion'     = $User.ProtectedFromAccidentalDeletion
-					'Last Logon'                  = $defaultuserlastlogon
-					'Password Never Expires'      = $AttVar.PasswordNeverExpires
-					'Days Until Password Expires' = $daystoexpire
+		New-LogWrite "((`"$defaultuserlastlogon`" -like `"Never`") -or ($($User.Enabled) -eq $True -and $defaultuserlastlogon -lt $((Get-Date).AddDays(- $Days)))"
+		If ($defaultuserlastlogon) {
+			New-LogWrite "((`"$defaultuserlastlogon`" -like `"Never`") -or ($($User.Enabled) -eq $True -and $defaultuserlastlogon -lt $((Get-Date).AddDays(- $Days)))"
+			If (("$defaultuserlastlogon" -like "Never") -or ($($User.Enabled) -eq $True -and $defaultuserlastlogon -lt $((Get-Date).AddDays(- $Days)))) {
+				New-LogWrite "[$loggingDate]  If ($User -and $AttVar -and $Days )"
+				New-LogWrite "[$loggingDate] psobject lastlogon =  $defaultuserlastlogon"
+				if (($User.Enabled -eq $True)) {
+					$objlastlogonobject = [PSCustomObject]@{
+						'Name'                        = $User.Name
+						'UserPrincipalName'           = $User.UserPrincipalName
+						'Enabled'                     = $AttVar.Enabled
+						'Protected from Deletion'     = $User.ProtectedFromAccidentalDeletion
+						'Last Logon'                  = $defaultuserlastlogon
+						'Password Never Expires'      = $AttVar.PasswordNeverExpires
+						'Days Until Password Expires' = $daystoexpire
+					}
+					$script:userphaventloggedonrecentlytable.Add($objlastlogonobject)
+					New-LogWrite "`$userphaventloggedonrecentlytable $userphaventloggedonrecentlytable"
 				}
-				$script:userphaventloggedonrecentlytable.Add($objlastlogonobject)
 			}
 		}
 		# Items for protected vs non protected users
