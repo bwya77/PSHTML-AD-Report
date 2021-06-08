@@ -1,4 +1,4 @@
-<#
+ <#
 .SYNOPSIS
     Generate graphed report for all Active Directory objects.
 
@@ -600,38 +600,38 @@ Function Get-Groups {
 
 	$Groups = Get-ADGroup -Filter * -Properties * #Initial gathering of AD groups.
 	$DistroCount = ($Groups | Where-Object { $_.GroupCategory -eq 'Distribution' }).Count # Grab all Distribution Groups and count.
-	$MailSecurityCount = ($Groups | Where-Object { $_.GroupCategory -eq 'Security' -and $_.mail -ne $null}).Count
-	$SecurityCount = ($Groups | Where-Object { $_.GroupCategory -eq 'Security' -and $_.mail -eq $null}).Count
+	$MailSecurityCount = ($Groups | Where-Object { $_.GroupCategory -eq 'Security' -and $null -ne $_.mail}).Count
+	$SecurityCount = ($Groups | Where-Object { $_.GroupCategory -eq 'Security' -and $null -eq $_.mail}).Count
 
 	foreach ($Group in $Groups) {
-		$DefaultADGroup = 'False'								# Reset DefaultADGroup Variable
-		$Manager = "" 											# Reset Manager Variable.	
-		$Gemail = (Get-ADGroup $Group -Properties mail).mail	# $Gemail - Grab the E-mail address of a group.
+		$DefaultADGroup = 'False'						# Reset DefaultADGroup Variable
+		$Manager = "" 								# Reset Manager Variable.	
+		$Gemail = (Get-ADGroup $Group -Properties mail).mail			# $Gemail - Grab the E-mail address of a group.
 
-		If ($Gemail -and $group.GroupCategory -eq 'Security') {				# If an E-mail address exists and if the group is a Security group.
-				$Type = 'Mail-Enabled Security Group'						# 	Assign type to Mail-enabled security group
+		If ($Gemail -and $group.GroupCategory -eq 'Security') {			# If an E-mail address exists and if the group is a Security group.
+			$Type = 'Mail-Enabled Security Group'				# 	Assign type to Mail-enabled security group
 		}
 		elseIf ($Gemail -and $group.GroupCategory -eq 'Distribution') {		# If an E-mail address exists and if the group is a Distribution group.
-				$Type = 'Distribution Group'								#	Assign type to distibution group
+				$Type = 'Distribution Group'				#	Assign type to distibution group
 		}
 		elseIf (!$Gemail -and $group.GroupCategory -eq 'Security') {		# If an E-mail address doesn't exist and if the group is a security group.
-				$Type = 'Security Group'									#	Assign type to (Non-mail enabled) Security group.
+				$Type = 'Security Group'				#	Assign type to (Non-mail enabled) Security group.
 		}
 
 
-		if ($Group.ProtectedFromAccidentalDeletion) {	# If the group is protected from accidental deletion
-			$GroupsProtected++							# 	increase the protected count by one.
+		if ($Group.ProtectedFromAccidentalDeletion) {				# If the group is protected from accidental deletion
+			$GroupsProtected++						# 	increase the protected count by one.
 		}
 		else {
 			$GroupsNotProtected++						# Else increase the "not protected" count by one.
 		}
 
 
-		if ($DefaultSGs -contains $Group.Name) {		# Check the current group being checked against the list of default groups
+		if ($DefaultSGs -contains $Group.Name) {				# Check the current group being checked against the list of default groups
 			$DefaultADGroup = 'True'					#	If there's a match, group is a default group
-			$DefaultGroup++								#	And increase the default group counter by one.
+			$DefaultGroup++							#	And increase the default group counter by one.
 		}
-		else {											# 	Else it's not a default group (aka custom)
+		else {									# 	Else it's not a default group (aka custom)
 			$CustomGroup++
 		}
 
@@ -639,16 +639,13 @@ Function Get-Groups {
 		if ($Group.Name -ne 'Domain Users') {					# Exclude the "Domain Users" group
 			$Users = (Get-ADGroupMember -Identity $Group | Sort-Object DisplayName | Select-Object -ExpandProperty Name) -join ', ' # Concatinate and format a list of group members
 
-			if (!$Users) {										# If there are not users
-				$Groupswithnomembership++						#	Increase the count of groups with no users by one.
+			if (!$Users) {							# If there are not users
+				$Groupswithnomembership++				#	Increase the count of groups with no users by one.
 			}
-			else {												# Else
-				$Groupswithmemebrship++							#	Increase the count of group with users by one.
+			else {								# Else
+				$Groupswithmemebrship++					#	Increase the count of group with users by one.
 			}
 		}
-			#else {
-			#	$Users = 'Skipped Domain Users Membership'		 # Group matches Domain Users [No need to set this variable because nothing is done with it at this point.]
-			#}
 
 
 		$OwnerDN = Get-ADGroup -Filter { name -eq $Group.Name } -Properties managedBy | Select-Object -ExpandProperty ManagedBy #Grabs Managedby property of group.
@@ -677,8 +674,8 @@ Function Get-Groups {
 	# TOP groups table
 	$objectmailgroups = [PSCustomObject]@{
 		'Total Groups'                 = $Groups.Count
-		'Mail-Enabled Security Groups' = $MailSecurityCount  	# Removed .Count
-		'Security Groups'              = $SecurityCount			# Removed .Count
+		'Mail-Enabled Security Groups' = $MailSecurityCount
+		'Security Groups'              = $SecurityCount
 		'Distribution Groups'          = $DistroCount
 	}
 	$script:TOPGroupsTable.Add($objectmailgroups)
