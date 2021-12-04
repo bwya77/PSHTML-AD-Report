@@ -1,4 +1,4 @@
-<#
+ <#
 .SYNOPSIS
     Generate graphed report for all Active Directory objects.
 
@@ -596,70 +596,69 @@ Function Get-Groups {
 	$GroupsProtected = 0
 	$GroupsNotProtected = 0
 
-	# Get groups and sort in alphabetical order
-	$Groups = Get-ADGroup -Filter * -Properties *
-	$DistroCount = $Groups | Where-Object { $_.GroupCategory -eq 'Distribution' }
-	$DistroCounts = $DistroCount.DistinguishedName.Count
+	# Get groups and get counts on Distribution, Non-Mail enabled Security, and Mail-Enabled groups 
+
+	$Groups = Get-ADGroup -Filter * -Properties * #Initial gathering of AD groups.
+	$DistroCount = ($Groups | Where-Object { $_.GroupCategory -eq 'Distribution' }).Count # Grab all Distribution Groups and count.
+	$MailSecurityCount = ($Groups | Where-Object { $_.GroupCategory -eq 'Security' -and $null -ne $_.mail}).Count
+	$SecurityCount = ($Groups | Where-Object { $_.GroupCategory -eq 'Security' -and $null -eq $_.mail}).Count
+
 	foreach ($Group in $Groups) {
-		$DefaultADGroup = 'False'
-		$Gemail = (Get-ADGroup $Group -Properties mail).mail
-		If ($Gemail) {
-			if ($group.GroupCategory -eq 'Security') {
-				$MailSecurityCount++
-			}
+		$DefaultADGroup = 'False'						# Reset DefaultADGroup Variable
+		$Manager = "" 								# Reset Manager Variable.	
+		$Gemail = (Get-ADGroup $Group -Properties mail).mail			# $Gemail - Grab the E-mail address of a group.
+
+		If ($Gemail -and $group.GroupCategory -eq 'Security') {			# If an E-mail address exists and if the group is a Security group.
+			$Type = 'Mail-Enabled Security Group'				# 	Assign type to Mail-enabled security group
 		}
-		If ($Gemail) {
-			if ($group.GroupCategory -eq 'Security') {
-				$SecurityCount++
-			}
+		elseIf ($Gemail -and $group.GroupCategory -eq 'Distribution') {		# If an E-mail address exists and if the group is a Distribution group.
+				$Type = 'Distribution Group'				#	Assign type to distibution group
 		}
-		if ($Group.ProtectedFromAccidentalDeletion -eq $True) {
-			$GroupsProtected++
+		elseIf (!$Gemail -and $group.GroupCategory -eq 'Security') {		# If an E-mail address doesn't exist and if the group is a security group.
+				$Type = 'Security Group'				#	Assign type to (Non-mail enabled) Security group.
 		}
-		else {
-			$GroupsNotProtected++
-		}
-		if ($DefaultSGs -contains $Group.Name) {
-			$DefaultADGroup = 'True'
-			$DefaultGroup++
+
+
+		if ($Group.ProtectedFromAccidentalDeletion) {				# If the group is protected from accidental deletion
+			$GroupsProtected++						# 	increase the protected count by one.
 		}
 		else {
+			$GroupsNotProtected++						# Else increase the "not protected" count by one.
+		}
+
+
+		if ($DefaultSGs -contains $Group.Name) {				# Check the current group being checked against the list of default groups
+			$DefaultADGroup = 'True'					#	If there's a match, group is a default group
+			$DefaultGroup++							#	And increase the default group counter by one.
+		}
+		else {									# 	Else it's not a default group (aka custom)
 			$CustomGroup++
 		}
-		if ($group.GroupCategory -eq 'Distribution') {
-			$Type = 'Distribution Group'
-		}
-		If ($Gemail) {
-			if ($group.GroupCategory -eq 'Security') {
-				$Type = 'Security Group'
+
+
+		if ($Group.Name -ne 'Domain Users') {					# Exclude the "Domain Users" group
+			$Users = (Get-ADGroupMember -Identity $Group | Sort-Object DisplayName | Select-Object -ExpandProperty Name) -join ', ' # Concatinate and format a list of group members
+
+			if (!$Users) {							# If there are not users
+				$Groupswithnomembership++				#	Increase the count of groups with no users by one.
+			}
+			else {								# Else
+				$Groupswithmemebrship++					#	Increase the count of group with users by one.
 			}
 		}
-		If ($Gemail) {
-			if ($group.GroupCategory -eq 'Security') {
-				$Type = 'Mail-Enabled Security Group'
+
+
+		$OwnerDN = Get-ADGroup -Filter { name -eq $Group.Name } -Properties managedBy | Select-Object -ExpandProperty ManagedBy #Grabs Managedby property of group.
+			Try {
+				$Manager = Get-ADUser -Filter { distinguishedname -like $OwnerDN } | Select-Object -ExpandProperty Name #Converts Managedby property to a name.
 			}
-		}
-		if ($Group.Name -ne 'Domain Users') {
-			$Users = (Get-ADGroupMember -Identity $Group | Sort-Object DisplayName | Select-Object -ExpandProperty Name) -join ', '
-			if (!$Users) {
-				$Groupswithnomembership++
+			Catch {
+				$groupname = $group.Name
+				New-LogWrite "[$loggingDate]  Manager attribute:$Manager  on the group  $groupname  missing"
 			}
-			else {
-				$Groupswithmemebrship++
-			}
-		}
-		else {
-			$Users = 'Skipped Domain Users Membership'
-		}
-		$OwnerDN = Get-ADGroup -Filter { name -eq $Group.Name } -Properties managedBy | Select-Object -ExpandProperty ManagedBy
-		Try {
-			$Manager = Get-ADUser -Filter { distinguishedname -like $OwnerDN } | Select-Object -ExpandProperty Name
-		}
-		Catch {
-			$groupname = $group.Name
-			New-LogWrite "[$loggingDate]  Manager attribute:$Manager  on the group  $groupname  missing"
-		}
 		# $Manager = $AllUsers | Where-Object { $_.distinguishedname -eq $OwnerDN } | Select-Object -ExpandProperty Name
+
+
 		$adgroupobject = [PSCustomObject]@{
 		
 			'Name'                    = $Group.name
@@ -675,28 +674,28 @@ Function Get-Groups {
 	# TOP groups table
 	$objectmailgroups = [PSCustomObject]@{
 		'Total Groups'                 = $Groups.Count
-		'Mail-Enabled Security Groups' = $MailSecurityCount.Count
-		'Security Groups'              = $SecurityCount.Count
-		'Distribution Groups'          = $DistroCounts
+		'Mail-Enabled Security Groups' = $MailSecurityCount
+		'Security Groups'              = $SecurityCount
+		'Distribution Groups'          = $DistroCount
 	}
 	$script:TOPGroupsTable.Add($objectmailgroups)
     
 	# Default Group Type Pie Chart
 	$objectmailgroupssec = [PSCustomObject]@{
 		'Name'  = 'Mail-Enabled Security Groups'
-		'Count' = $MailSecurityCount.Count
+		'Count' = $MailSecurityCount
 	}
 	$script:GroupTypetable.Add($objectmailgroupssec)
 
 	$secgroups = [PSCustomObject]@{
 		'Name'  = 'Security Groups'
-		'Count' = $SecurityCount.Count
+		'Count' = $SecurityCount
 	}
 	$script:GroupTypetable.Add($secgroups)
 
 	$distgroups = [PSCustomObject]@{
 		'Name'  = 'Distribution Groups'
-		'Count' = $DistroCounts
+		'Count' = $DistroCount
 	}
 	$script:GroupTypetable.Add($distgroups)
 
