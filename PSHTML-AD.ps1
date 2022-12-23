@@ -655,17 +655,8 @@ foreach ($Group in $Groups)
 		$Users = "Skipped Domain Users Membership"
 	}
 	
-	$OwnerDN = Get-ADGroup -Filter { name -eq $Group.Name } -Properties managedBy | Select-Object -ExpandProperty ManagedBy
-	Try
-	{
-		$Manager = Get-ADUser -Filter { distinguishedname -like $OwnerDN } | Select-Object -ExpandProperty Name
-	}
-	Catch
-	{
-		write-host -ForegroundColor Yellow "Cannot resolve the manager, " $Manager " on the group " $group.name
-	}
+	$Manager = (Get-ADGroup -Filter { name -eq $Group.Name } -Properties managedBy | Select-Object -ExpandProperty ManagedBy) -replace '^CN=|,.*$'
 	
-	#$Manager = $AllUsers | Where-Object { $_.distinguishedname -eq $OwnerDN } | Select-Object -ExpandProperty Name
 	
 	$obj = [PSCustomObject]@{
 		
